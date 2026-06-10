@@ -1,0 +1,352 @@
+"""Tests for settings CRUD, encryption, masking, and SSRF protection."""
+
+import json
+from unittest.mock import patch
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.database import Base, get_db
+from app.main import app
+from app.models.settings import Setting  # noqa: F401
+from app.routes.settings import ALLOWED_LLM_HOSTS, validate_llm_url
+from app.utils.secrets import decrypt_value, encrypt_value, is_masked, mask_value
+
+TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+
+# ---------------------------------------------------------------------------
+# Test DB fixtures (separate from conftest to keep isolation)
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def settings_engine():
+    eng = create_async_engine(
+        TEST_DB_URL, echo=False, future=True, connect_args={"check_same_thread": False}
+    )
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield eng
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await eng.dispose()
+
+
+@pytest_asyncio.fixture
+async def settings_session(settings_engine):
+    factory = async_sessionmaker(settings_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        yield session
+
+
+@pytest_asyncio.fixture
+async def settings_client(settings_session):
+    async def _override():
+        yield settings_session
+
+    from app.auth import verify_token
+
+    async def _bypass_verify_token():
+        return None
+
+    app.dependency_overrides[get_db] = _override
+    app.dependency_overrides[verify_token] = _bypass_verify_token
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+# ===========================================================================
+# SSRF — validate_llm_url
+# ===========================================================================
+
+
+class TestValidateLLMUrl:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://api.openai.com/v1",
+            "http://localhost:11434",
+            "http://127.0.0.1:11434",
+            "https://api.anthropic.com/v1/messages",
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            "https://us-central1-aiplatform.googleapis.com/v1/projects/xyz",
+            "http://[::1]:8080",
+        ],
+    )
+    def test_allowed_hosts_pass(self, url: str):
+        assert validate_llm_url(url) == url
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://evil.com/steal",
+            "http://192.168.1.1/scan",
+            "http://10.0.0.1/internal",
+            "https://attacker.example.com",
+            "http://169.254.169.254/metadata",
+        ],
+    )
+    def test_rejected_hosts_raise(self, url: str):
+        with pytest.raises(ValueError, match="not in the allowed list"):
+            validate_llm_url(url)
+
+    def test_empty_string_passes(self):
+        assert validate_llm_url("") == ""
+
+    def test_allowed_llm_hosts_constant(self):
+        assert "api.openai.com" in ALLOWED_LLM_HOSTS
+        assert "localhost" in ALLOWED_LLM_HOSTS
+        assert "127.0.0.1" in ALLOWED_LLM_HOSTS
+
+
+# ===========================================================================
+# Settings CRUD
+# ===========================================================================
+
+
+class TestSettingsCRUD:
+    @pytest.mark.asyncio
+    async def test_create_and_read_setting(self,settings_client: AsyncClient):
+        # Create
+        resp = await settings_client.put(
+            "/api/settings/",
+            json={"key": "model_name", "value": "gpt-4o", "category": "llm"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["key"] == "model_name"
+        assert body["value"] == "gpt-4o"
+        assert body["category"] == "llm"
+
+        # Read single
+        resp = await settings_client.get("/api/settings/key/model_name")
+        assert resp.status_code == 200
+        assert resp.json()["value"] == "gpt-4o"
+
+    @pytest.mark.asyncio
+    async def test_list_settings(self, settings_client: AsyncClient):
+        await settings_client.put(
+            "/api/settings/",
+            json={"key": "k1", "value": "v1", "category": "cat_a"},
+        )
+        await settings_client.put(
+            "/api/settings/",
+            json={"key": "k2", "value": "v2", "category": "cat_b"},
+        )
+        resp = await settings_client.get("/api/settings/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "cat_a" in data
+        assert "cat_b" in data
+
+    @pytest.mark.asyncio
+    async def test_update_existing_setting(self, settings_client: AsyncClient):
+        await settings_client.put(
+            "/api/settings/",
+            json={"key": "my_key", "value": "old", "category": "general"},
+        )
+        resp = await settings_client.put(
+            "/api/settings/",
+            json={"key": "my_key", "value": "new", "category": "general"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["value"] == "new"
+
+    @pytest.mark.asyncio
+    async def test_delete_setting(self, settings_client: AsyncClient):
+        await settings_client.put(
+            "/api/settings/",
+            json={"key": "to_delete", "value": "gone", "category": "general"},
+        )
+        resp = await settings_client.delete("/api/settings/key/to_delete")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "deleted"
+
+        # Confirm gone
+        resp = await settings_client.get("/api/settings/key/to_delete")
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_setting(self, settings_client: AsyncClient):
+        resp = await settings_client.get("/api/settings/key/nonexistent")
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# Encryption & Masking in settings API
+# ===========================================================================
+
+
+class TestSettingsEncryption:
+    @pytest.mark.asyncio
+    async def test_sensitive_key_is_encrypted_on_save(
+        self, settings_client: AsyncClient, settings_session: AsyncSession
+    ):
+        plain = "sk-test-key-1234567890"
+        resp = await settings_client.put(
+            "/api/settings/",
+            json={"key": "openai_api_key", "value": plain, "category": "llm"},
+        )
+        assert resp.status_code == 200
+
+        # Response should show masked value
+        body = resp.json()
+        assert body["key"] == "openai_api_key"
+        # Masked value should contain asterisks
+        assert "*" in body["value"]
+        assert body["value"] != plain
+
+        # Raw DB value should be encrypted (not plaintext, not masked)
+        from sqlalchemy import select
+
+        result = await settings_session.execute(
+            select(Setting).where(Setting.key == "openai_api_key")
+        )
+        row = result.scalar_one()
+        assert row.value != plain  # encrypted
+        assert decrypt_value(row.value) == plain  # can be decrypted back
+
+    @pytest.mark.asyncio
+    async def test_non_sensitive_key_not_encrypted(
+        self, settings_client: AsyncClient, settings_session: AsyncSession
+    ):
+        resp = await settings_client.put(
+            "/api/settings/",
+            json={"key": "model_name", "value": "gpt-4o", "category": "llm"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["value"] == "gpt-4o"  # returned as-is
+
+    @pytest.mark.asyncio
+    async def test_masked_value_preserved_on_resave(
+        self, settings_client: AsyncClient, settings_session: AsyncSession
+    ):
+        plain = "sk-original-key-12345"
+        await settings_client.put(
+            "/api/settings/",
+            json={"key": "claude_api_key", "value": plain, "category": "llm"},
+        )
+
+        from sqlalchemy import select
+
+        await settings_session.commit()
+        result = await settings_session.execute(
+            select(Setting).where(Setting.key == "claude_api_key")
+        )
+        encrypted_val = result.scalar_one().value
+
+        masked = mask_value(plain)
+        resp = await settings_client.put(
+            "/api/settings/",
+            json={"key": "claude_api_key", "value": masked, "category": "llm"},
+        )
+        assert resp.status_code == 200
+
+        await settings_session.commit()
+        settings_session.expire_all()
+        result = await settings_session.execute(
+            select(Setting).where(Setting.key == "claude_api_key")
+        )
+        row = result.scalar_one()
+        assert row.value == encrypted_val
+
+    @pytest.mark.asyncio
+    async def test_batch_upsert_encrypts_sensitive_keys(
+        self, settings_client: AsyncClient, settings_session: AsyncSession
+    ):
+        resp = await settings_client.put(
+            "/api/settings/batch",
+            json={
+                "settings": [
+                    {"key": "openai_api_key", "value": "sk-batch-test", "category": "llm"},
+                    {"key": "timeout", "value": "30", "category": "llm"},
+                ]
+            },
+        )
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) == 2
+
+        # openai_api_key should be masked in response
+        openai_item = next(i for i in items if i["key"] == "openai_api_key")
+        assert "*" in openai_item["value"]
+
+        # timeout should be plaintext
+        timeout_item = next(i for i in items if i["key"] == "timeout")
+        assert timeout_item["value"] == "30"
+
+
+# ===========================================================================
+# LLM config endpoint
+# ===========================================================================
+
+
+class TestLLMConfigEndpoint:
+    @pytest.mark.asyncio
+    async def test_get_llm_config_defaults(self, settings_client: AsyncClient):
+        resp = await settings_client.get("/api/settings/llm/config")
+        assert resp.status_code == 200
+        body = resp.json()
+        # Should return defaults when nothing saved
+        assert body["llm_service"] == "no_llm"
+        assert body["timeout"] == 60
+
+    @pytest.mark.asyncio
+    async def test_save_and_read_llm_config(self, settings_client: AsyncClient):
+        # Save config with an API key
+        resp = await settings_client.put(
+            "/api/settings/llm/config",
+            json={
+                "llm_service": "openai",
+                "openai_api_key": "sk-llm-test-key-abcdef",
+                "openai_model": "gpt-4o-mini",
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["llm_service"] == "openai"
+        # API key should be masked in response
+        assert "*" in body["openai_api_key"]
+
+        # Read it back — should still be masked
+        resp = await settings_client.get("/api/settings/llm/config")
+        body = resp.json()
+        assert body["llm_service"] == "openai"
+        assert "*" in body["openai_api_key"]
+        assert body["openai_model"] == "gpt-4o-mini"
+
+    @pytest.mark.asyncio
+    async def test_masked_api_key_preserved_on_resave(self, settings_client: AsyncClient):
+        # Save initial config
+        await settings_client.put(
+            "/api/settings/llm/config",
+            json={
+                "llm_service": "gemini",
+                "gemini_api_key": "AIza-sy-original-key-data",
+            },
+        )
+
+        # Read back (masked)
+        resp = await settings_client.get("/api/settings/llm/config")
+        masked_key = resp.json()["gemini_api_key"]
+        assert is_masked(masked_key)
+
+        # Re-save with masked value (user changed something else)
+        resp = await settings_client.put(
+            "/api/settings/llm/config",
+            json={
+                "llm_service": "gemini",
+                "gemini_api_key": masked_key,
+                "gemini_model_name": "gemini-2.0-flash",
+            },
+        )
+        assert resp.status_code == 200
+
+        # The masked key should remain masked in response
+        assert is_masked(resp.json()["gemini_api_key"])

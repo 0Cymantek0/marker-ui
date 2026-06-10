@@ -1,0 +1,44 @@
+import { useState } from 'react'
+import { Outlet } from 'react-router-dom'
+import { Toaster } from 'sonner'
+import { Sidebar } from './Sidebar'
+import { ThemeProvider, useTheme } from './ThemeContext'
+
+export function AppLayout() {
+  const [collapsed, setCollapsed] = useState(false)
+
+  return (
+    <ThemeProvider>
+      <AppContent collapsed={collapsed} setCollapsed={setCollapsed} />
+    </ThemeProvider>
+  )
+}
+
+function AppContent({
+  collapsed,
+  setCollapsed,
+}: {
+  collapsed: boolean
+  setCollapsed: React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  const { theme } = useTheme()
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
+      {/* Sidebar */}
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+      />
+
+      {/* Main area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <main className="flex-1 overflow-auto p-6 bg-slate-50/50 dark:bg-slate-950/20">
+          <Outlet />
+        </main>
+      </div>
+
+      <Toaster theme={theme} position="bottom-right" />
+    </div>
+  )
+}

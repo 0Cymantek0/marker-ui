@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+env/
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Database
+*.db
+*.sqlite3
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Runtime data
+data/
+uploads/
+output/
+
+# Logs
+*.log
+logs/
+
+# Agent / Tooling
+.omo/
+.opencode/
+.commandcode/
+
+
+# Alembic cache
+backend/alembic/versions/__pycache__/
+
+# Test / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Model cache (large files)
+models/
+*.pt
+*.bin
+*.onnx
+*.safetensors
+AGENTS.md

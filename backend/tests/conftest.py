@@ -1,0 +1,239 @@
+"""Shared test fixtures — async client, in-memory DB, mocked MarkerService."""
+
+from __future__ import annotations
+
+import os
+import asyncio
+from typing import Any, AsyncGenerator
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# Must be set before importing app modules
+os.environ["API_TOKEN"] = "test-secret-token"
+os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItdW5pdHRlc3Q="
+
+from starlette.requests import Request
+
+from app.database import Base, get_db
+from app.models.job import ConversionJob  # noqa: F401 — ensure table is registered
+from app.models.settings import Setting  # noqa: F401
+
+
+# ---------------------------------------------------------------------------
+# In-memory SQLite engine & session factory
+# ---------------------------------------------------------------------------
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+test_engine = create_async_engine(
+    TEST_DATABASE_URL,
+    echo=False,
+    future=True,
+    connect_args={"check_same_thread": False},
+)
+test_session_factory = async_sessionmaker(
+    test_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+
+async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Drop-in replacement for get_db that uses the test engine."""
+    async with test_session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+
+# ---------------------------------------------------------------------------
+# Verify-token override that reads Authorization: Bearer header
+# ---------------------------------------------------------------------------
+
+async def _override_verify_token(request: Request, credentials=None):
+    """Test auth dependency that checks both header and query param."""
+    from fastapi import HTTPException, status
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    if request.url.path == "/api/health":
+        return None
+
+    token = os.environ.get("API_TOKEN", "")
+    provided = None
+    if credentials is not None:
+        provided = credentials.credentials
+    else:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            provided = auth_header[7:]
+        else:
+            query_token = request.query_params.get("token")
+            if query_token:
+                provided = query_token
+
+    if provided is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Provide a valid Authorization: Bearer <token> header.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    import secrets
+    if not secrets.compare_digest(provided, token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Fake MarkerService
+# ---------------------------------------------------------------------------
+
+class FakeMarkerService:
+    """Replaces MarkerService so tests never load real ML models."""
+
+    def __init__(self) -> None:
+        self._initialized = False
+
+    def initialize(self) -> None:
+        self._initialized = True
+
+    def convert_file(self, filepath: str, options: dict[str, Any]) -> dict[str, Any]:
+        """Return a deterministic fake conversion result."""
+        return {
+            "text": "# Fake Markdown\n\nConverted successfully.",
+            "extension": "md",
+            "images": [],
+            "metadata": {"pages": 1},
+        }
+
+
+class FakeTaskManager:
+    """Minimal TaskManager that runs conversion synchronously in-process."""
+
+    def __init__(self) -> None:
+        self._progress: dict[str, int] = {}
+        self._status: dict[str, str] = {}
+        self._marker_service: FakeMarkerService | None = None
+
+    def set_marker_service(self, svc: FakeMarkerService) -> None:
+        self._marker_service = svc
+
+    def submit_job(
+        self,
+        job_id: str,
+        filepath: str,
+        config: dict[str, Any],
+        marker_service: Any,
+    ) -> None:
+        """Immediately run the fake conversion so tests don't need threads."""
+        self._progress[job_id] = 0
+        self._status[job_id] = "processing"
+        # Simulate completion instantly
+        self._progress[job_id] = 100
+        self._status[job_id] = "completed"
+
+    def get_status(self, job_id: str) -> dict[str, Any]:
+        return {
+            "job_id": job_id,
+            "status": self._status.get(job_id, "pending"),
+            "progress": self._progress.get(job_id, 0),
+        }
+
+    async def cancel_job(self, job_id: str) -> bool:
+        self._status[job_id] = "cancelled"
+        self._progress.pop(job_id, None)
+        return True
+
+    async def job_events(self, request, job_id: str):
+        """Yield one progress + one terminal event, then stop."""
+        from sse_starlette.event import ServerSentEvent
+        import json
+
+        info = self.get_status(job_id)
+        # Yield a progress event
+        yield ServerSentEvent(
+            data=json.dumps({"job_id": job_id, "status": "processing", "progress": 50}),
+            event="progress",
+        )
+        # Yield a terminal status event
+        yield ServerSentEvent(
+            data=json.dumps(info),
+            event="status",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create a single event loop for the entire test session."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def setup_db():
+    """Create tables before each test and drop them after."""
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """Provide an httpx AsyncClient wired to the FastAPI app with overrides."""
+    from app.main import app, _app_state
+    from app.auth import verify_token
+
+    fake_service = FakeMarkerService()
+    fake_tm = FakeTaskManager()
+    fake_tm.set_marker_service(fake_service)
+
+    # Override the module-level _app_state attributes
+    original_ms = _app_state.marker_service
+    original_tm = _app_state.task_manager
+
+    _app_state.marker_service = fake_service  # type: ignore[assignment]
+    _app_state.task_manager = fake_tm  # type: ignore[assignment]
+
+    # Override both DB and auth dependencies
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[verify_token] = _override_verify_token
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac
+
+    # Restore
+    _app_state.marker_service = original_ms  # type: ignore[assignment]
+    _app_state.task_manager = original_tm  # type: ignore[assignment]
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provide a raw async DB session for direct DB assertions."""
+    async with test_session_factory() as session:
+        yield session
+
+
+@pytest.fixture
+def auth_headers() -> dict[str, str]:
+    """Return authorization headers with the valid test token."""
+    return {"Authorization": "Bearer test-secret-token"}

@@ -1,0 +1,423 @@
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  Download,
+  Trash2,
+  RotateCcw,
+  FileText,
+  Loader2,
+  Search,
+  Filter,
+  XCircle,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  FileCode,
+  AlertCircle,
+  Activity,
+  Award,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
+import { getHistory, deleteJob, downloadResult, type JobStatus } from '@/lib/api'
+import { cn } from '@/lib/utils'
+
+const STATUS_VARIANT = {
+  queued: 'secondary' as const,
+  processing: 'warning' as const,
+  completed: 'success' as const,
+  failed: 'destructive' as const,
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+export function HistoryPage() {
+  const [jobs, setJobs] = useState<JobStatus[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(true)
+  
+  // Filtering states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [converterFilter, setConverterFilter] = useState<string>('all')
+  
+  // Expanded job tracking
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null)
+
+  const fetchJobs = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const data = await getHistory(page, 50) // load a larger page size to support local filtering
+      setJobs(data.jobs)
+      setTotal(data.total)
+    } catch {
+      toast.error('Failed to load conversion history')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [page])
+
+  useEffect(() => {
+    void fetchJobs()
+  }, [fetchJobs])
+
+  const handleDelete = async (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation() // Prevent toggling expansion
+    if (!confirm('Are you sure you want to delete this job and its output?')) return
+    
+    try {
+      await deleteJob(jobId)
+      toast.success('Job deleted successfully')
+      if (expandedJobId === jobId) setExpandedJobId(null)
+      void fetchJobs()
+    } catch {
+      toast.error('Failed to delete job')
+    }
+  }
+
+  const handleDownload = async (e: React.MouseEvent, jobId: string, filename: string) => {
+    e.stopPropagation() // Prevent toggling expansion
+    try {
+      const blob = await downloadResult(jobId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const stem = filename.split('.').slice(0, -1).join('.') || 'output'
+      a.download = `marker-${stem}-${jobId}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('Download started')
+    } catch {
+      toast.error('Failed to download result package')
+    }
+  }
+
+  // Local filtering & search
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      const matchesSearch = job.filename.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesStatus = statusFilter === 'all' || job.status === statusFilter
+      const matchesConverter = converterFilter === 'all' || job.converter === converterFilter
+      return matchesSearch && matchesStatus && matchesConverter
+    })
+  }, [jobs, searchQuery, statusFilter, converterFilter])
+
+  // Statistics calculation
+  const stats = useMemo(() => {
+    const totalCount = jobs.length
+    const completedCount = jobs.filter(j => j.status === 'completed').length
+    const failedCount = jobs.filter(j => j.status === 'failed').length
+    const processingCount = jobs.filter(j => j.status === 'processing' || j.status === 'queued').length
+    const successRate = totalCount > 0 ? Math.round((completedCount / (totalCount - processingCount || 1)) * 100) : 100
+
+    return {
+      total: total,
+      completed: completedCount,
+      failed: failedCount,
+      successRate,
+      processing: processingCount
+    }
+  }, [jobs, total])
+
+  const toggleExpand = (jobId: string) => {
+    setExpandedJobId(expandedJobId === jobId ? null : jobId)
+  }
+
+  const totalPages = Math.ceil(total / 20)
+
+  return (
+    <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border/20 pb-5">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">Conversion History</h2>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1.5 leading-relaxed">
+            Browse, preview, and download previous document conversions.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => void fetchJobs()} className="rounded-lg hover:bg-muted/50">
+          <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Dashboard Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="glass-card p-5 flex items-center justify-between border border-border/30 shadow-sm">
+          <div>
+            <p className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase">Total Conversions</p>
+            <h3 className="text-3xl font-extrabold mt-2 text-foreground">{stats.total}</h3>
+          </div>
+          <div className="p-3 rounded-xl bg-secondary text-foreground border border-border/30">
+            <Activity className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-card p-5 flex items-center justify-between border border-border/30 shadow-sm">
+          <div>
+            <p className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase">Success Rate</p>
+            <h3 className="text-3xl font-extrabold mt-2 text-foreground">{stats.successRate}%</h3>
+          </div>
+          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <Award className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-card p-5 flex items-center justify-between border border-border/30 shadow-sm">
+          <div>
+            <p className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase">Failed Jobs</p>
+            <h3 className="text-3xl font-extrabold mt-2 text-rose-600 dark:text-rose-400">{stats.failed}</h3>
+          </div>
+          <div className="p-3 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+            <XCircle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-card p-5 flex items-center justify-between border border-border/30 shadow-sm">
+          <div>
+            <p className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase">Active Tasks</p>
+            <h3 className="text-3xl font-extrabold mt-2 text-amber-600 dark:text-amber-400">{stats.processing}</h3>
+          </div>
+          <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Area */}
+      <div className="flex flex-col md:flex-row items-center gap-4 py-2">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+          <Input
+            placeholder="Search filename..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 bg-background/40 border-border/50 h-9 text-xs"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-1.5 shrink-0 text-xs font-semibold text-muted-foreground">
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filter:</span>
+          </div>
+          
+          <Select
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: 'All Statuses' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'failed', label: 'Failed' },
+              { value: 'processing', label: 'Processing' },
+              { value: 'queued', label: 'Queued' },
+            ]}
+          />
+
+          <Select
+            value={converterFilter}
+            onChange={setConverterFilter}
+            options={[
+              { value: 'all', label: 'All Engines' },
+              { value: 'PdfConverter', label: 'Standard PDF' },
+              { value: 'TableConverter', label: 'Table Focused' },
+              { value: 'OCRConverter', label: 'OCR Extraction' },
+              { value: 'ExtractionConverter', label: 'Fast Text' },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* Jobs History List */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-24 space-y-4">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          <p className="text-sm text-muted-foreground animate-pulse">Loading conversion logs...</p>
+        </div>
+      ) : filteredJobs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center glass-card border border-border/40">
+          <FileText className="w-12 h-12 text-muted-foreground/20 mb-4 select-none" />
+          <p className="text-base font-semibold text-muted-foreground">No matches found</p>
+          <p className="text-xs text-muted-foreground/60 mt-1 max-w-[280px]">
+            Try clearing filters or search query, or upload a document on the Convert page.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3 animate-fade-in-stagger select-none">
+          {filteredJobs.map((job) => {
+            const isExpanded = expandedJobId === job.id
+            return (
+              <div 
+                key={job.id} 
+                className={cn(
+                  'border border-border/40 shadow-sm glass-card rounded-xl overflow-hidden transition-all duration-200 cursor-pointer',
+                  isExpanded ? 'border-primary/30 ring-1 ring-primary/10' : 'hover:border-border hover:bg-muted/5'
+                )}
+                onClick={() => toggleExpand(job.id)}
+              >
+                  {/* Job Header Row */}
+                  <div className="flex items-center gap-4 p-4">
+                    {/* File icon badge */}
+                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary shrink-0">
+                      <FileCode className="w-5 h-5" />
+                    </div>
+
+                    {/* Metadata details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+                        <p className="text-sm font-semibold truncate text-foreground">{job.filename}</p>
+                        <Badge variant={STATUS_VARIANT[job.status]} className="w-fit text-[10px] py-0.5 px-1.5">
+                          {job.status}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-muted-foreground/90 font-medium">
+                        <span className="uppercase text-primary font-bold">{job.output_format}</span>
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                        <span>{job.converter}</span>
+                        <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                        <span>{formatDate(job.created_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions & Expand toggler */}
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {job.status === 'completed' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleDownload(e, job.id, job.filename)}
+                          className="w-8 h-8 rounded-lg hover:bg-muted"
+                          title="Download Zip"
+                        >
+                          <Download className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                      )}
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => handleDelete(e, job.id)}
+                        className="w-8 h-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-500"
+                        title="Delete entry"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleExpand(job.id)}
+                        className="w-8 h-8 rounded-lg hover:bg-muted"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Expandable Details Panel */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-1 border-t border-border/20 bg-muted/5 animate-fade-in cursor-default select-text" onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-3 pt-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Job ID</span>
+                            <span className="text-xs font-mono break-all text-foreground/90 select-all block mt-1">{job.id}</span>
+                          </div>
+                          
+                          <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Completed At</span>
+                            <span className="text-xs font-medium text-foreground/90 block mt-1">
+                              {job.completed_at ? formatDate(job.completed_at) : 'N/A'}
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Status Code</span>
+                            <span className="text-xs font-mono font-bold capitalize text-foreground/90 block mt-1">{job.status}</span>
+                          </div>
+                        </div>
+
+                        {/* Error Traceback (if failed) */}
+                        {job.status === 'failed' && job.error_message && (
+                          <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/5 text-rose-600 dark:text-rose-400">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold">
+                              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                              <span>Execution Mismatch (Error Message)</span>
+                            </div>
+                            <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed mt-2 p-2 rounded bg-rose-950/20 border border-rose-500/10">
+                              {job.error_message}
+                            </pre>
+                          </div>
+                        )}
+
+                        {/* Converted text preview (if completed) */}
+                        {job.status === 'completed' && (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Document Output Preview</span>
+                            <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm bg-slate-950/5/10 max-h-[220px] overflow-y-auto">
+                              {job.result_text ? (
+                                <pre className="p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-text text-slate-800 dark:text-slate-300">
+                                  {job.result_text}
+                                </pre>
+                              ) : (
+                                <div className="p-6 text-center text-xs text-muted-foreground italic bg-background/40">
+                                  No inline text preview available. Result was compiled and archived in the zip download package.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  )}
+
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4 select-none">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="rounded-lg h-8 px-3"
+          >
+            Previous
+          </Button>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="rounded-lg h-8 px-3"
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}

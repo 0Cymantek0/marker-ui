@@ -1,0 +1,14 @@
+{
+  "include": ["app"],
+  "venvPath": ".",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportUnknownMemberType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportExplicitAny": "none",
+  "reportPrivateUsage": "none",
+  "reportCallInDefaultInitializer": "none",
+  "reportDeprecated": "none"
+}

@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Manrope (loaded via index.html <link>) ─── */
+
+@layer base {
+  /* ─── Light theme ─── */
+  :root {
+    --background: 210 20% 97.5%;       /* soft slate off-white */
+    --foreground: 215 25% 15%;         /* soft navy-slate charcoal */
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    --primary: 215 25% 20%;            /* soft slate gray */
+    --primary-foreground: 210 20% 98%; /* soft white */
+    --secondary: 210 16% 93%;          /* soft gray-blue */
+    --secondary-foreground: 215 25% 15%;
+    --muted: 210 16% 93%;
+    --muted-foreground: 215 12% 46%;   /* slate-500 */
+    --accent: 210 16% 93%;
+    --accent-foreground: 215 25% 15%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 16% 89%;             /* soft gray-blue border */
+    --input: 210 16% 89%;
+    --ring: 215 25% 20%;
+    --radius: 0.75rem;
+
+    /* Glassmorphism helpers */
+    --glass-bg: 0 0% 100% / 0.6;
+    --glass-border: 210 16% 89% / 0.4;
+    --glass-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.05);
+  }
+
+  /* ─── Dark theme ─── */
+  .dark {
+    --background: 222 20% 12%;         /* soft deep midnight-slate */
+    --foreground: 215 15% 82%;         /* soft silver-gray */
+    --card: 222 20% 14%;               /* soft elevated dark card */
+    --card-foreground: 215 15% 82%;
+    --popover: 222 20% 13%;
+    --popover-foreground: 215 15% 82%;
+    --primary: 215 15% 88%;            /* soft light silver-white */
+    --primary-foreground: 222 20% 12%; /* dark color text */
+    --secondary: 222 15% 18%;          /* softer slate-800 highlight */
+    --secondary-foreground: 215 15% 88%;
+    --muted: 222 15% 18%;
+    --muted-foreground: 215 10% 58%;   /* slate-400 */
+    --accent: 222 15% 18%;
+    --accent-foreground: 215 15% 88%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 15% 20%;             /* soft border */
+    --input: 222 15% 20%;
+    --ring: 215 15% 82%;
+
+    --glass-bg: 222 20% 12% / 0.5;
+    --glass-border: 222 15% 20% / 0.3;
+    --glass-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.3);
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    font-family: 'Manrope', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer components {
+  /* ─── Glassmorphism card ─── */
+  .glass-card {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius);
+  }
+
+
+
+  /* ─── Staggered fade-in utility ─── */
+  .animate-fade-in-stagger > * {
+    opacity: 0;
+    animation: fade-in 0.3s ease-out forwards;
+  }
+  .animate-fade-in-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .animate-fade-in-stagger > *:nth-child(2) { animation-delay: 60ms; }
+  .animate-fade-in-stagger > *:nth-child(3) { animation-delay: 120ms; }
+  .animate-fade-in-stagger > *:nth-child(4) { animation-delay: 180ms; }
+  .animate-fade-in-stagger > *:nth-child(5) { animation-delay: 240ms; }
+  .animate-fade-in-stagger > *:nth-child(6) { animation-delay: 300ms; }
+}
+
+/* ─── Smooth scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+
+/* ─── Firefox scrollbar ─── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+}

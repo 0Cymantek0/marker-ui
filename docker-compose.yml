@@ -1,0 +1,21 @@
+services:
+  marker-ui:
+    image: ghcr.io/0cymantek0/marker-ui:latest
+    build: .
+    ports:
+      - "127.0.0.1:3000:80"
+    volumes:
+      - marker-data:/app/backend/data
+    environment:
+      - MARKER_HOST=0.0.0.0
+      - MARKER_PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  marker-data:
