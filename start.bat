@@ -118,16 +118,23 @@ if not "%BACKEND_PORT%"=="8000" (
 echo   Starting backend on http://localhost:%BACKEND_PORT% ...
 start /B .venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --app-dir backend
 
-:: Wait for backend to start
-timeout /t 3 /nobreak >nul
-
-:: Check if backend is actually listening
+:: Wait for backend to start (checks up to 15 times with 1-second delay)
+echo   Waiting for backend to start...
+set WAIT_COUNT=0
+:checkBackendLoop
 netstat -aon | findstr ":%BACKEND_PORT% .*LISTENING" >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo   ERROR: Backend failed to start on port %BACKEND_PORT%.
+if %ERRORLEVEL% equ 0 goto backendStarted
+set /a WAIT_COUNT+=1
+if %WAIT_COUNT% geq 15 (
+    echo   ERROR: Backend failed to start on port %BACKEND_PORT% within 15 seconds.
     pause
     exit /b 1
 )
+timeout /t 1 /nobreak >nul
+goto checkBackendLoop
+
+:backendStarted
+echo   Backend is listening on port %BACKEND_PORT%.
 
 echo   Starting frontend on http://localhost:5173 ...
 cd frontend

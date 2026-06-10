@@ -296,3 +296,48 @@ export async function deleteJob(jobId: string): Promise<void> {
 export async function healthCheck(): Promise<{ status: string }> {
   return request<{ status: string }>('/health')
 }
+
+// ─── Model Download Onboarding ───────────────────────────────────────
+
+export interface FileDownloadInfo {
+  status: 'downloading' | 'completed' | 'failed'
+  downloaded_bytes: number
+  total_bytes: number
+}
+
+export interface ModelDownloadInfo {
+  name: string
+  status: 'pending' | 'downloading' | 'completed' | 'failed'
+  downloaded_bytes: number
+  total_bytes: number
+  progress: number
+  files: Record<string, FileDownloadInfo>
+}
+
+export interface ModelTrackerStatus {
+  initialized: boolean
+  loading: boolean
+  cancel_requested: boolean
+  error: string | null
+  models: Record<string, ModelDownloadInfo>
+  overall: {
+    status: 'pending' | 'downloading' | 'loading' | 'completed' | 'failed'
+    progress: number
+    downloaded_bytes: number
+    total_bytes: number
+    speed: number // MB/s
+    eta: number // seconds
+  }
+}
+
+export async function getModelsStatus(): Promise<ModelTrackerStatus> {
+  return request<ModelTrackerStatus>('/models/status')
+}
+
+export async function cancelModelsDownload(): Promise<{ status: string }> {
+  return request<{ status: string }>('/models/cancel', { method: 'POST' })
+}
+
+export async function retryModelsDownload(): Promise<{ status: string }> {
+  return request<{ status: string }>('/models/retry', { method: 'POST' })
+}

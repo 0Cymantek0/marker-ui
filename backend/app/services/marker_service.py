@@ -117,27 +117,34 @@ def build_marker_options(
     return options
 
 
+import threading
+from app.services.model_tracker import tracker
+
 class MarkerService:
     """Manages marker-pdf model loading and document conversion."""
 
     def __init__(self) -> None:
         self._model_dict: dict[str, Any] | None = None
         self._initialized = False
+        self._lock = threading.Lock()
 
     def initialize(self) -> None:
-        if self._initialized:
-            return
+        with self._lock:
+            if self._initialized:
+                return
 
-        t0 = time.perf_counter()
-        _import_marker()
+            tracker.set_loading(True)
+            t0 = time.perf_counter()
+            _import_marker()
 
-        from marker.models import create_model_dict
+            from marker.models import create_model_dict
 
-        logger.info("Loading marker model dict ...")
-        self._model_dict = create_model_dict()
-        elapsed = time.perf_counter() - t0
-        logger.info("Marker models loaded in %.1f s", elapsed)
-        self._initialized = True
+            logger.info("Loading marker model dict ...")
+            self._model_dict = create_model_dict()
+            elapsed = time.perf_counter() - t0
+            logger.info("Marker models loaded in %.1f s", elapsed)
+            self._initialized = True
+            tracker.set_initialized(True)
 
     def convert_file(
         self,

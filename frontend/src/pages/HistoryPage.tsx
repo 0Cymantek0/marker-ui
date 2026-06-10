@@ -25,10 +25,11 @@ import { getHistory, deleteJob, downloadResult, type JobStatus } from '@/lib/api
 import { cn } from '@/lib/utils'
 
 const STATUS_VARIANT = {
-  queued: 'secondary' as const,
+  pending: 'secondary' as const,
   processing: 'warning' as const,
   completed: 'success' as const,
   failed: 'destructive' as const,
+  cancelled: 'outline' as const,
 }
 
 function formatDate(dateStr: string): string {
@@ -121,7 +122,7 @@ export function HistoryPage() {
     const totalCount = jobs.length
     const completedCount = jobs.filter(j => j.status === 'completed').length
     const failedCount = jobs.filter(j => j.status === 'failed').length
-    const processingCount = jobs.filter(j => j.status === 'processing' || j.status === 'queued').length
+    const processingCount = jobs.filter(j => j.status === 'processing' || j.status === 'pending').length
     const successRate = totalCount > 0 ? Math.round((completedCount / (totalCount - processingCount || 1)) * 100) : 100
 
     return {

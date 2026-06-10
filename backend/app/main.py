@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import UPLOAD_DIR, OUTPUT_DIR
 from app.database import create_tables
-from app.routes import convert, settings
+from app.routes import convert, settings, models
 from app.services.marker_service import MarkerService
 from app.services.task_manager import TaskManager
 
@@ -35,6 +35,18 @@ _app_state = _AppState()
 
 def _load_models_background() -> None:
     import threading
+    from app.services.model_tracker import tracker, check_models_downloaded
+
+    # If already initialized, do nothing
+    if tracker.get_status_dict()["initialized"]:
+        return
+
+    # Reset tracker state for a fresh session
+    tracker.reset()
+
+    # If already downloaded, set to loading state
+    if check_models_downloaded():
+        tracker.set_loading(True)
 
     def _worker() -> None:
         t0 = time.perf_counter()
@@ -43,12 +55,17 @@ def _load_models_background() -> None:
             logger.info(
                 "MarkerService initialised in %.1f s", time.perf_counter() - t0
             )
-        except Exception:
-            logger.warning(
-                "MarkerService could not load models - conversion endpoints will "
-                "retry lazily on first request.",
-                exc_info=True,
-            )
+        except Exception as exc:
+            if tracker.cancel_requested:
+                tracker.set_cancelled()
+                logger.info("MarkerService initialization cancelled by user.")
+            else:
+                tracker.set_failed(str(exc))
+                logger.warning(
+                    "MarkerService could not load models - conversion endpoints will "
+                    "retry lazily on first request.",
+                    exc_info=True,
+                )
 
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
@@ -68,6 +85,11 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
 
     # Create DB tables
     await create_tables()
+
+    # Apply download tracker monkeypatching
+    from app.services.model_tracker import setup_monkeypatch, register_retry_callback
+    setup_monkeypatch()
+    register_retry_callback(_load_models_background)
 
     _load_models_background()
 
@@ -99,6 +121,7 @@ app.add_middleware(
 # Routers
 app.include_router(convert.router)
 app.include_router(settings.router)
+app.include_router(models.router)
 
 
 
