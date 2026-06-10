@@ -100,7 +100,7 @@ ok "Node.js dependencies installed"
 # ── Data dirs ────────────────────────────────────────────────────────
 echo ""
 echo -e "${YELLOW}[5/6] Creating data directories...${NC}"
-mkdir -p data/uploads data/output .omo
+mkdir -p data/uploads data/output
 ok "Data directories ready"
 
 # ── Start services ───────────────────────────────────────────────────
@@ -118,20 +118,40 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
+find_free_port() {
+    local port=$1
+    while lsof -ti:$port &>/dev/null; do
+        port=$((port + 1))
+        if [ $port -ge 65535 ]; then
+            err "No free port found for backend."
+            exit 1
+        fi
+    done
+    echo $port
+}
+
+BACKEND_PORT=$(find_free_port 8000)
+
+if [ "$BACKEND_PORT" -ne 8000 ]; then
+    warn "Port 8000 is in use, using port $BACKEND_PORT instead."
+fi
+
+export BACKEND_PORT
+
 # Backend
-info "Starting backend on http://localhost:8000 ..."
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir backend > .omo/backend.log 2>&1 &
+info "Starting backend on http://localhost:$BACKEND_PORT ..."
+uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT --app-dir backend &
 BACKEND_PID=$!
 sleep 3
 
 if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    err "Backend failed to start. Check .omo/backend.log"
+    err "Backend failed to start."
     exit 1
 fi
 
 # Frontend
 info "Starting frontend on http://localhost:5173 ..."
-cd frontend && npm run dev > ../.omo/frontend.log 2>&1 &
+cd frontend && BACKEND_PORT=$BACKEND_PORT npm run dev > /dev/null 2>&1 &
 FRONTEND_PID=$!
 cd ..
 sleep 3
@@ -142,8 +162,8 @@ ok "═════════════════════════�
 ok "Marker UI is running!"
 echo ""
 info "  Frontend:  ${CYAN}http://localhost:5173${NC}"
-info "  Backend:   ${CYAN}http://localhost:8000${NC}"
-info "  API Docs:  ${CYAN}http://localhost:8000/docs${NC}"
+info "  Backend:   ${CYAN}http://localhost:$BACKEND_PORT${NC}"
+info "  API Docs:  ${CYAN}http://localhost:$BACKEND_PORT/docs${NC}"
 echo ""
 warn "  Press Ctrl+C to stop both services."
 ok "════════════════════════════════════════════════════"

@@ -10,13 +10,8 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load .env file if present
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
-
-from app.auth import get_api_token, verify_token
-
 
 from app.core.config import UPLOAD_DIR, OUTPUT_DIR
 from app.database import create_tables
@@ -74,8 +69,6 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     # Create DB tables
     await create_tables()
 
-    logger.info("API Token: %s", get_api_token())
-
     _load_models_background()
 
     yield
@@ -103,37 +96,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-class AccessTokenMiddleware(BaseHTTPMiddleware):
-    """Optional access token check. Only active if MARKER_ACCESS_TOKEN is set."""
-
-    async def dispatch(self, request, call_next):
-        from app.core.config import ACCESS_TOKEN
-
-        # Skip non-API paths (frontend static files)
-        if not request.url.path.startswith("/api/"):
-            return await call_next(request)
-        # Skip health endpoint
-        if request.url.path == "/api/health":
-            return await call_next(request)
-        # If no token configured, allow all
-        if not ACCESS_TOKEN:
-            return await call_next(request)
-        # Check header
-        provided = request.headers.get("x-access-token", "")
-        if provided != ACCESS_TOKEN:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid or missing access token"},
-            )
-        return await call_next(request)
-
-
-app.add_middleware(AccessTokenMiddleware)
-
 # Routers
-app.include_router(convert.router, dependencies=[Depends(verify_token)])
-app.include_router(settings.router, dependencies=[Depends(verify_token)])
+app.include_router(convert.router)
+app.include_router(settings.router)
 
 
 

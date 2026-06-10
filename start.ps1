@@ -154,26 +154,48 @@ Write-Host ""
 Write-Host "[6/6] Starting services..." -ForegroundColor Yellow
 Write-Host ""
 
-# Backend
-Write-Host "  Starting backend on http://localhost:8000 ..." -ForegroundColor Cyan
-$venvUvicorn = if ($IsWindows -or $env:OS -match "Windows") {
-    ".venv\Scripts\uvicorn.exe"
-} else {
-    ".venv/bin/uvicorn"
+function Find-FreePort {
+    param([int]$StartPort = 8000)
+    $port = $StartPort
+    while ($port -lt 65535) {
+        $inUse = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+        if (-not $inUse) { return $port }
+        $port++
+    }
+    return $null
 }
 
-$backendJob = Start-Process -FilePath $venvUvicorn -ArgumentList "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "backend" -PassThru -NoNewWindow -RedirectStandardOutput ".omo\backend.log" -RedirectStandardError ".omo\backend_err.log"
+$backendPort = Find-FreePort -StartPort 8000
+if (-not $backendPort) {
+    Write-Host "  ERROR: No free port found for backend." -ForegroundColor Red
+    exit 1
+}
+
+if ($backendPort -ne 8000) {
+    Write-Host "  Port 8000 is in use, using port $backendPort instead." -ForegroundColor DarkYellow
+}
+
+$env:BACKEND_PORT = $backendPort
+
+# Backend
+Write-Host "  Starting backend on http://localhost:$backendPort ..." -ForegroundColor Cyan
+$venvPythonFull = (Resolve-Path $venvPython).Path
+$backendJob = Start-Process -FilePath $venvPythonFull -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", $backendPort, "--app-dir", "backend" -PassThru -WindowStyle Hidden
 
 Start-Sleep -Seconds 3
 
 if ($backendJob.HasExited) {
-    Write-Host "  ERROR: Backend failed to start. Check .omo/backend_err.log" -ForegroundColor Red
+    Write-Host "  ERROR: Backend failed to start." -ForegroundColor Red
     exit 1
 }
 
-# Frontend
+# Frontend — use cmd.exe because npm is a .cmd file on Windows, not a real .exe
 Write-Host "  Starting frontend on http://localhost:5173 ..." -ForegroundColor Cyan
-$frontendJob = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "frontend" -PassThru -NoNewWindow -RedirectStandardOutput ".omo\frontend.log" -RedirectStandardError ".omo\frontend_err.log"
+if ($IsWindows -or $env:OS -match "Windows") {
+    $frontendJob = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "set BACKEND_PORT=$backendPort && npm run dev" -WorkingDirectory "$PWD\frontend" -PassThru -WindowStyle Hidden
+} else {
+    $frontendJob = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "$PWD/frontend" -PassThru -WindowStyle Hidden
+}
 
 Start-Sleep -Seconds 3
 
@@ -184,8 +206,8 @@ Write-Host "  ══════════════════════
 Write-Host "  Marker UI is running!" -ForegroundColor Green
 Write-Host ""
 Write-Host "    Frontend:  http://localhost:5173" -ForegroundColor White
-Write-Host "    Backend:   http://localhost:8000" -ForegroundColor White
-Write-Host "    API Docs:  http://localhost:8000/docs" -ForegroundColor White
+Write-Host "    Backend:   http://localhost:$backendPort" -ForegroundColor White
+Write-Host "    API Docs:  http://localhost:$backendPort/docs" -ForegroundColor White
 Write-Host ""
 Write-Host "  Press Ctrl+C to stop both services." -ForegroundColor DarkGray
 Write-Host "  ═══════════════════════════════════════════════════" -ForegroundColor Green

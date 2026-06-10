@@ -12,10 +12,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Must be set before importing app modules
-os.environ["API_TOKEN"] = "test-secret-token"
 os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItdW5pdHRlc3Q="
-
-from starlette.requests import Request
 
 from app.database import Base, get_db
 from app.models.job import ConversionJob  # noqa: F401 — ensure table is registered
@@ -50,49 +47,6 @@ async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
-
-
-# ---------------------------------------------------------------------------
-# Verify-token override that reads Authorization: Bearer header
-# ---------------------------------------------------------------------------
-
-async def _override_verify_token(request: Request, credentials=None):
-    """Test auth dependency that checks both header and query param."""
-    from fastapi import HTTPException, status
-    from fastapi.security import HTTPAuthorizationCredentials
-
-    if request.url.path == "/api/health":
-        return None
-
-    token = os.environ.get("API_TOKEN", "")
-    provided = None
-    if credentials is not None:
-        provided = credentials.credentials
-    else:
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.lower().startswith("bearer "):
-            provided = auth_header[7:]
-        else:
-            query_token = request.query_params.get("token")
-            if query_token:
-                provided = query_token
-
-    if provided is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Provide a valid Authorization: Bearer <token> header.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    import secrets
-    if not secrets.compare_digest(provided, token):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -199,22 +153,18 @@ async def setup_db():
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """Provide an httpx AsyncClient wired to the FastAPI app with overrides."""
     from app.main import app, _app_state
-    from app.auth import verify_token
 
     fake_service = FakeMarkerService()
     fake_tm = FakeTaskManager()
     fake_tm.set_marker_service(fake_service)
 
-    # Override the module-level _app_state attributes
     original_ms = _app_state.marker_service
     original_tm = _app_state.task_manager
 
     _app_state.marker_service = fake_service  # type: ignore[assignment]
     _app_state.task_manager = fake_tm  # type: ignore[assignment]
 
-    # Override both DB and auth dependencies
     app.dependency_overrides[get_db] = _override_get_db
-    app.dependency_overrides[verify_token] = _override_verify_token
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
@@ -231,9 +181,3 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a raw async DB session for direct DB assertions."""
     async with test_session_factory() as session:
         yield session
-
-
-@pytest.fixture
-def auth_headers() -> dict[str, str]:
-    """Return authorization headers with the valid test token."""
-    return {"Authorization": "Bearer test-secret-token"}

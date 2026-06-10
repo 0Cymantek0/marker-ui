@@ -89,7 +89,6 @@ echo [5/6] Creating data directories...
 if not exist "data" mkdir data
 if not exist "data\uploads" mkdir data\uploads
 if not exist "data\output" mkdir data\output
-if not exist ".omo" mkdir .omo
 
 echo   Data directories ready
 
@@ -98,15 +97,41 @@ echo.
 echo [6/6] Starting services...
 echo.
 
-echo   Starting backend on http://localhost:8000 ...
-start /B .venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --app-dir backend > .omo\backend.log 2>&1
+:: Find a free port for the backend (starting from 8000)
+set BACKEND_PORT=8000
+:findPort
+    netstat -aon | findstr ":%BACKEND_PORT% .*LISTENING" >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        set /a BACKEND_PORT+=1
+        if %BACKEND_PORT% geq 65535 (
+            echo   ERROR: No free port found for backend.
+            pause
+            exit /b 1
+        )
+        goto findPort
+    )
+
+if not "%BACKEND_PORT%"=="8000" (
+    echo   Port 8000 is in use, using port %BACKEND_PORT% instead.
+)
+
+echo   Starting backend on http://localhost:%BACKEND_PORT% ...
+start /B .venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --app-dir backend
 
 :: Wait for backend to start
 timeout /t 3 /nobreak >nul
 
+:: Check if backend is actually listening
+netstat -aon | findstr ":%BACKEND_PORT% .*LISTENING" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo   ERROR: Backend failed to start on port %BACKEND_PORT%.
+    pause
+    exit /b 1
+)
+
 echo   Starting frontend on http://localhost:5173 ...
 cd frontend
-start /B npm run dev > ..\.omo\frontend.log 2>&1
+start "" /B cmd /c "set BACKEND_PORT=%BACKEND_PORT% && npm run dev"
 cd ..
 
 timeout /t 3 /nobreak >nul
@@ -116,8 +141,8 @@ echo   ========================================
 echo   Marker UI is running!
 echo.
 echo     Frontend:  http://localhost:5173
-echo     Backend:   http://localhost:8000
-echo     API Docs:  http://localhost:8000/docs
+echo     Backend:   http://localhost:%BACKEND_PORT%
+echo     API Docs:  http://localhost:%BACKEND_PORT%/docs
 echo.
 echo   Close this window to stop all services.
 echo   ========================================

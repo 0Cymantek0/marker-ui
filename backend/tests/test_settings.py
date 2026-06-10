@@ -47,13 +47,7 @@ async def settings_client(settings_session):
     async def _override():
         yield settings_session
 
-    from app.auth import verify_token
-
-    async def _bypass_verify_token():
-        return None
-
     app.dependency_overrides[get_db] = _override
-    app.dependency_overrides[verify_token] = _bypass_verify_token
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as c:

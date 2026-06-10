@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-from typing import Optional
 
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
@@ -16,8 +15,6 @@ HOST: str = os.getenv("MARKER_HOST", "127.0.0.1")
 PORT: int = int(os.getenv("MARKER_PORT", "8000"))
 DEBUG: bool = os.getenv("MARKER_DEBUG", "false").lower() in ("true", "1", "yes")
 
-# Security
-ACCESS_TOKEN: Optional[str] = os.getenv("MARKER_ACCESS_TOKEN", None)
 MAX_UPLOAD_SIZE: int = int(os.getenv("MARKER_MAX_UPLOAD_SIZE_MB", "100")) * 1024 * 1024
 
 # Database

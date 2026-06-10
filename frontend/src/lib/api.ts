@@ -74,26 +74,6 @@ export interface LLMConfig {
   max_output_tokens: number
 }
 
-// ─── Auth Token ────────────────────────────────────────────────────
-
-const TOKEN_KEY = 'marker_api_token'
-
-export function getApiToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || ''
-}
-
-export function setApiToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearApiToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-}
-
-export function hasApiToken(): boolean {
-  return !!localStorage.getItem(TOKEN_KEY)
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 // Convert backend LLMConfig to frontend LLMConfig
@@ -185,15 +165,9 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getApiToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
-  }
-
-  // Add auth header if token is set
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -201,33 +175,11 @@ async function request<T>(
     headers,
   })
 
-  // Handle 401 — prompt for token
-  if (res.status === 401) {
-    const newToken = prompt('Authentication required. Enter your API token:')
-    if (newToken) {
-      setApiToken(newToken)
-      // Retry with new token
-      headers['Authorization'] = `Bearer ${newToken}`
-      const retryRes = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers,
-      })
-      if (!retryRes.ok) {
-        const body = await retryRes.text().catch(() => retryRes.statusText)
-        throw new Error(`API ${retryRes.status}: ${body}`)
-      }
-      if (retryRes.status === 204) return undefined as T
-      return retryRes.json() as Promise<T>
-    }
-    throw new Error('Authentication required. Please set your API token.')
-  }
-
   if (!res.ok) {
     const body = await res.text().catch(() => res.statusText)
     throw new Error(`API ${res.status}: ${body}`)
   }
 
-  // Handle 204 No Content
   if (res.status === 204) return undefined as T
 
   return res.json() as Promise<T>
@@ -254,37 +206,10 @@ export async function uploadFile(
   if (config.disable_multiprocessing !== undefined) params.append('disable_multiprocessing', String(config.disable_multiprocessing))
   if (config.debug !== undefined) params.append('debug', String(config.debug))
 
-  const token = getApiToken()
-  const headers: Record<string, string> = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  // Don't set Content-Type for multipart — browser sets it with boundary
-
   const res = await fetch(`${API_BASE}/convert/upload?${params.toString()}`, {
     method: 'POST',
     body: form,
-    headers,
   })
-
-  // Handle 401
-  if (res.status === 401) {
-    const newToken = prompt('Authentication required. Enter your API token:')
-    if (newToken) {
-      setApiToken(newToken)
-      const retryRes = await fetch(`${API_BASE}/convert/upload?${params.toString()}`, {
-        method: 'POST',
-        body: form,
-        headers: { 'Authorization': `Bearer ${newToken}` },
-      })
-      if (!retryRes.ok) {
-        const body = await retryRes.text().catch(() => retryRes.statusText)
-        throw new Error(`Upload failed (${retryRes.status}): ${body}`)
-      }
-      return retryRes.json() as Promise<ConversionResponse>
-    }
-    throw new Error('Authentication required.')
-  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => res.statusText)
@@ -303,21 +228,11 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
 }
 
 export function getJobEvents(jobId: string): EventSource {
-  const token = getApiToken()
-  const url = token
-    ? `${API_BASE}/convert/events/${jobId}?token=${encodeURIComponent(token)}`
-    : `${API_BASE}/convert/events/${jobId}`
-  return new EventSource(url)
+  return new EventSource(`${API_BASE}/convert/events/${jobId}`)
 }
 
 export async function downloadResult(jobId: string): Promise<Blob> {
-  const token = getApiToken()
-  const headers: Record<string, string> = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch(`${API_BASE}/convert/download/${jobId}`, { headers })
-  if (res.status === 401) throw new Error('Authentication required.')
+  const res = await fetch(`${API_BASE}/convert/download/${jobId}`)
   if (!res.ok) throw new Error(`Download failed (${res.status})`)
   return res.blob()
 }

@@ -41,13 +41,7 @@ async def upload_client(upload_session):
     async def _override():
         yield upload_session
 
-    from app.auth import verify_token
-
-    async def _bypass_verify_token():
-        return None
-
     app.dependency_overrides[get_db] = _override
-    app.dependency_overrides[verify_token] = _bypass_verify_token
 
     mock_task_mgr = MagicMock()
     mock_task_mgr.submit_job = MagicMock()
