@@ -68,7 +68,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {collapsed && (
             <span
               className={cn(
-                'absolute bottom-0 right-0 w-2 h-2 rounded-full border border-background animate-pulse-soft',
+                'absolute bottom-0 right-0 w-2 h-2 rounded-full border border-background',
                 connected ? 'bg-emerald-500' : 'bg-red-500'
               )}
               title={connected ? 'Connected' : 'Offline'}
@@ -83,7 +83,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <div className="flex items-center gap-1 mt-1">
               <span
                 className={cn(
-                  'w-1.5 h-1.5 rounded-full animate-pulse-soft',
+                  'w-1.5 h-1.5 rounded-full',
                   connected ? 'bg-emerald-500' : 'bg-red-500'
                 )}
               />

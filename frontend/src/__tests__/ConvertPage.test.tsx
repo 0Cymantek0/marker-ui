@@ -19,15 +19,18 @@ vi.mock('@/components/features/ConversionOptions', () => ({
 }))
 
 vi.mock('@/components/features/TerminalLog', () => ({
-  TerminalLog: ({ logs }: { logs: string[] }) => (
+  TerminalLog: ({ logs, onClose }: { logs: string[]; onClose?: () => void }) => (
     <div data-testid="terminal-log">
       TerminalLog Logs Count: {logs.length}
+      {onClose && (
+        <button onClick={onClose}>Close console</button>
+      )}
     </div>
   )
 }))
 
 describe('ConvertPage component', () => {
-  it('renders initial state with empty queue and console visible by default', () => {
+  it('renders initial state with empty queue and console closed by default', () => {
     mockUseConversionQueue.mockReturnValue({
       jobs: [],
       start: vi.fn(),
@@ -45,13 +48,12 @@ describe('ConvertPage component', () => {
     expect(screen.getByTestId('file-upload')).toBeInTheDocument()
     expect(screen.getByTestId('conversion-options')).toBeInTheDocument()
 
-    // Console logs is standby/empty but rendered because showConsole is true
-    expect(screen.getByTestId('terminal-log')).toBeInTheDocument()
-    expect(screen.getByText('TerminalLog Logs Count: 0')).toBeInTheDocument()
+    // Console logs is closed by default
+    expect(screen.queryByTestId('terminal-log')).not.toBeInTheDocument()
+    expect(screen.getByText('Open Console')).toBeInTheDocument()
   })
 
   it('renders queue items and overall progress without crash', () => {
-    // This is the regression test verifying completedJobs and overallProgress are defined!
     mockUseConversionQueue.mockReturnValue({
       jobs: [
         {
@@ -84,10 +86,9 @@ describe('ConvertPage component', () => {
     expect(screen.getByText('Overall:')).toBeInTheDocument()
     expect(screen.getByText('1 of 1 completed')).toBeInTheDocument()
     expect(screen.getByText('100%')).toBeInTheDocument()
-    expect(screen.getByText('TerminalLog Logs Count: 1')).toBeInTheDocument()
   })
 
-  it('toggles console visibility when clicking the console button', () => {
+  it('toggles console visibility when clicking the console buttons', () => {
     mockUseConversionQueue.mockReturnValue({
       jobs: [],
       start: vi.fn(),
@@ -99,22 +100,21 @@ describe('ConvertPage component', () => {
 
     render(<ConvertPage />)
 
-    // Initially console is visible
-    expect(screen.getByTestId('terminal-log')).toBeInTheDocument()
-    expect(screen.getByText('Hide Console')).toBeInTheDocument()
-
-    // Click hide button
-    fireEvent.click(screen.getByText('Hide Console'))
-
-    // Now console is hidden
+    // Initially console is closed
     expect(screen.queryByTestId('terminal-log')).not.toBeInTheDocument()
-    expect(screen.getByText('Show Console')).toBeInTheDocument()
+    expect(screen.getByText('Open Console')).toBeInTheDocument()
 
-    // Click show button
-    fireEvent.click(screen.getByText('Show Console'))
+    // Click Open Console button
+    fireEvent.click(screen.getByText('Open Console'))
 
-    // Console is visible again
+    // Now console is visible
     expect(screen.getByTestId('terminal-log')).toBeInTheDocument()
-    expect(screen.getByText('Hide Console')).toBeInTheDocument()
+    expect(screen.getByText('TerminalLog Logs Count: 0')).toBeInTheDocument()
+
+    // Click close button
+    fireEvent.click(screen.getByText('Close console'))
+
+    // Console is closed again
+    expect(screen.queryByTestId('terminal-log')).not.toBeInTheDocument()
   })
 })

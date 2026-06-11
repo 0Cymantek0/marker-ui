@@ -61,11 +61,21 @@ const config: Config = {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.6' },
         },
+        'overlay-fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'modal-zoom-in': {
+          '0%': { opacity: '0', transform: 'scale(0.96) translateY(12px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
       },
       animation: {
-        'fade-in': 'fade-in 0.3s ease-out forwards',
-        'slide-in': 'slide-in 0.3s ease-out forwards',
+        'fade-in': 'fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'slide-in': 'slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
+        'overlay-fade-in': 'overlay-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'modal-zoom-in': 'modal-zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
     },
   },

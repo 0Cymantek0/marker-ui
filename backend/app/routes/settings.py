@@ -20,6 +20,8 @@ from app.models.schemas import (
     SettingsBatchUpdateRequest,
     SettingsResponse,
     SettingsUpdateRequest,
+    GPUStatusResponse,
+    GPUToggleRequest,
 )
 from app.utils.secrets import (
     decrypt_value,
@@ -463,3 +465,46 @@ async def get_defaults() -> dict[str, Any]:
     from app.services.marker_service import MarkerService
 
     return MarkerService.get_defaults()
+
+
+# ------------------------------------------------------------------
+# GPU Acceleration
+# ------------------------------------------------------------------
+
+@router.get("/gpu/status", response_model=GPUStatusResponse)
+async def get_gpu_status() -> GPUStatusResponse:
+    """Get current GPU acceleration status, logs, and progress."""
+    from app.services.gpu_service import gpu_service
+
+    return GPUStatusResponse(**gpu_service.status_dict)
+
+
+@router.post("/gpu/install", response_model=GPUStatusResponse)
+async def install_gpu() -> GPUStatusResponse:
+    """Trigger background installation of CUDA-enabled PyTorch."""
+    from app.services.gpu_service import gpu_service
+
+    gpu_service.start_install()
+    return GPUStatusResponse(**gpu_service.status_dict)
+
+
+@router.post("/gpu/toggle")
+async def toggle_gpu(
+    body: GPUToggleRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Save the GPU acceleration enabled preference in settings database."""
+    stmt = select(Setting).where(Setting.key == "gpu_acceleration_enabled")
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+
+    val = "true" if body.enabled else "false"
+    if row:
+        row.value = val
+        row.category = "gpu"
+    else:
+        db.add(Setting(key="gpu_acceleration_enabled", value=val, category="gpu"))
+    await db.commit()
+    return {"status": "success", "enabled": body.enabled}
+
+

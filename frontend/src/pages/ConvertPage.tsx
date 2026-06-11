@@ -29,7 +29,7 @@ export function ConvertPage() {
   const [outputDir, setOutputDir] = useState<string>('')
   const [config, setConfig] = useState<ConversionConfig>(DEFAULT_CONFIG)
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
-  const [showConsole, setShowConsole] = useState(true)
+  const [showConsole, setShowConsole] = useState(false)
 
   const { jobs, start, cancel, download, clearLogs, removeJob } = useConversionQueue()
 
@@ -151,29 +151,21 @@ export function ConvertPage() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowConsole(!showConsole)}
+                onClick={() => setShowConsole(true)}
                 className="h-8 text-[10px] font-bold uppercase tracking-wider gap-1.5 rounded-lg text-muted-foreground hover:text-foreground"
               >
                 <Terminal className="w-3.5 h-3.5" />
-                {showConsole ? 'Hide Console' : 'Show Console'}
+                Open Console
               </Button>
             </div>
             
             {showConsole && (
-              <div className="animate-fade-in">
-                {selectedJob ? (
-                  <TerminalLog
-                    logs={selectedJob.logs}
-                    phase={selectedJob.phase}
-                    onClear={() => clearLogs(selectedJob.id)}
-                  />
-                ) : (
-                  <TerminalLog
-                    logs={[]}
-                    phase="idle"
-                  />
-                )}
-              </div>
+              <TerminalLog
+                logs={selectedJob ? selectedJob.logs : []}
+                phase={selectedJob ? selectedJob.phase : 'idle'}
+                onClear={selectedJob ? () => clearLogs(selectedJob.id) : undefined}
+                onClose={() => setShowConsole(false)}
+              />
             )}
           </div>
 
@@ -220,8 +212,8 @@ export function ConvertPage() {
                       className={cn(
                         'relative p-3.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between gap-4 select-none overflow-hidden',
                         isSelected
-                          ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
-                          : 'border-border/50 bg-card/35 hover:bg-muted/20 hover:border-border'
+                          ? 'border-primary/40 bg-primary/5 shadow-sm ring-1 ring-primary/10'
+                          : 'border-border/20 bg-card/35 hover:bg-muted/20 hover:border-border'
                       )}
                     >
                       {/* Glassmorphic progress bar background inside the card itself */}
@@ -287,21 +279,7 @@ export function ConvertPage() {
 
                       {/* Actions aligned directly inside the UI card to save space */}
                       <div className="flex items-center gap-1.5 relative z-10" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedJobId(job.id)
-                            setShowConsole(true)
-                          }}
-                          className={cn(
-                            "h-8 text-[10px] font-bold uppercase tracking-wider gap-1.5 rounded-lg text-muted-foreground hover:text-foreground",
-                            isSelected && "text-primary hover:text-primary"
-                          )}
-                        >
-                          <Terminal className="w-3.5 h-3.5" />
-                          Console
-                        </Button>
+
 
                         {isCompleted && (
                           <Button

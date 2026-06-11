@@ -296,7 +296,7 @@ export function HistoryPage() {
           <p className="text-sm text-muted-foreground animate-pulse">Loading conversion logs...</p>
         </div>
       ) : filteredJobs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center glass-card border border-border/40">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
           <FileText className="w-12 h-12 text-muted-foreground/20 mb-4 select-none" />
           <p className="text-base font-semibold text-muted-foreground">No matches found</p>
           <p className="text-xs text-muted-foreground/60 mt-1 max-w-[280px]">
@@ -385,67 +385,72 @@ export function HistoryPage() {
                   </div>
 
                   {/* Expandable Details Panel */}
-                  {isExpanded && (
-                    <div className="px-3 pb-3 pt-1 border-t border-border/10 bg-muted/5 animate-fade-in cursor-default select-text" onClick={(e) => e.stopPropagation()}>
-                      <div className="space-y-3 pt-3">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Job ID</span>
-                            <span className="text-xs font-mono break-all text-foreground/90 select-all block mt-1">{job.id}</span>
-                          </div>
-                          
-                          <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Completed At</span>
-                            <span className="text-xs font-medium text-foreground/90 block mt-1">
-                              {job.completed_at ? formatDate(job.completed_at) : 'N/A'}
-                            </span>
+                  <div className={cn(
+                    "grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                    isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  )}>
+                    <div className="overflow-hidden">
+                      <div className="px-3 pb-3 pt-1 border-t border-border/10 bg-muted/5 cursor-default select-text" onClick={(e) => e.stopPropagation()}>
+                        <div className="space-y-3 pt-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Job ID</span>
+                              <span className="text-xs font-mono break-all text-foreground/90 select-all block mt-1">{job.id}</span>
+                            </div>
+                            
+                            <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Completed At</span>
+                              <span className="text-xs font-medium text-foreground/90 block mt-1">
+                                {job.completed_at ? formatDate(job.completed_at) : 'N/A'}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Status Code</span>
+                              <span className="text-xs font-mono font-bold capitalize text-foreground/90 block mt-1">{job.status}</span>
+                            </div>
                           </div>
 
-                          <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Status Code</span>
-                            <span className="text-xs font-mono font-bold capitalize text-foreground/90 block mt-1">{job.status}</span>
-                          </div>
+                          {/* Error Traceback (if failed) */}
+                          {job.status === 'failed' && job.error_message && (
+                            <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/5 text-rose-600 dark:text-rose-400">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                                <span>Execution Mismatch (Error Message)</span>
+                              </div>
+                              <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed mt-2 p-2 rounded bg-rose-950/20 border border-rose-500/10">
+                                {job.error_message}
+                              </pre>
+                            </div>
+                          )}
+
+                          {/* Converted text preview (if completed) */}
+                          {job.status === 'completed' && (
+                            <div className="space-y-1.5">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Document Output Preview</span>
+                              <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm bg-slate-950/5/10 max-h-[220px] overflow-y-auto">
+                                {loadingPreviews[job.id] ? (
+                                  <div className="p-6 text-center text-xs text-muted-foreground italic bg-background/40 flex items-center justify-center gap-2">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
+                                    Loading document preview...
+                                  </div>
+                                ) : job.result_text ? (
+                                  <pre className="p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-text text-slate-800 dark:text-slate-300">
+                                    {job.result_text}
+                                  </pre>
+                                ) : (
+                                  <div className="p-6 text-center text-xs text-muted-foreground italic bg-background/40">
+                                    No inline text preview available. Result was compiled and archived in the zip download package.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                         </div>
-
-                        {/* Error Traceback (if failed) */}
-                        {job.status === 'failed' && job.error_message && (
-                          <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/5 text-rose-600 dark:text-rose-400">
-                            <div className="flex items-center gap-1.5 text-xs font-semibold">
-                              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-                              <span>Execution Mismatch (Error Message)</span>
-                            </div>
-                            <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed mt-2 p-2 rounded bg-rose-950/20 border border-rose-500/10">
-                              {job.error_message}
-                            </pre>
-                          </div>
-                        )}
-
-                        {/* Converted text preview (if completed) */}
-                        {job.status === 'completed' && (
-                          <div className="space-y-1.5">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Document Output Preview</span>
-                            <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm bg-slate-950/5/10 max-h-[220px] overflow-y-auto">
-                              {loadingPreviews[job.id] ? (
-                                <div className="p-6 text-center text-xs text-muted-foreground italic bg-background/40 flex items-center justify-center gap-2">
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
-                                  Loading document preview...
-                                </div>
-                              ) : job.result_text ? (
-                                <pre className="p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-text text-slate-800 dark:text-slate-300">
-                                  {job.result_text}
-                                </pre>
-                              ) : (
-                                <div className="p-6 text-center text-xs text-muted-foreground italic bg-background/40">
-                                  No inline text preview available. Result was compiled and archived in the zip download package.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
                       </div>
                     </div>
-                  )}
+                  </div>
 
               </div>
             )

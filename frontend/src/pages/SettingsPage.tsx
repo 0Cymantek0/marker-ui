@@ -19,10 +19,23 @@ import {
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { useLLMConfig } from '@/hooks/useSettings'
 import { useMutation } from '@/hooks/useSettings'
-import { updateLLMConfig, testLLMConnection, type LLMConfig, type LLMService } from '@/lib/api'
+import {
+  updateLLMConfig,
+  testLLMConnection,
+  getSettings,
+  getGPUStatus,
+  installGPU,
+  toggleGPU,
+  type LLMConfig,
+  type LLMService,
+  type GPUStatus
+} from '@/lib/api'
 import { cn } from '@/lib/utils'
+
 
 const LLM_SERVICES: { value: LLMService; label: string; desc: string; icon: string }[] = [
   { value: 'none', label: 'None', desc: 'No LLM integrations', icon: 'Cpu' },
@@ -78,6 +91,78 @@ export function SettingsPage() {
   useEffect(() => {
     if (config) setForm(config)
   }, [config])
+
+  const [gpuEnabled, setGpuEnabled] = useState(false)
+  const [gpuStatus, setGpuStatus] = useState<GPUStatus | null>(null)
+  const [isPollingGpu, setIsPollingGpu] = useState(false)
+
+  useEffect(() => {
+    async function loadGpuSetting() {
+      try {
+        const settingsList = await getSettings()
+        const gpuSetting = settingsList.find(s => s.key === 'gpu_acceleration_enabled')
+        setGpuEnabled(gpuSetting?.value === 'true')
+      } catch (err) {
+        console.error('Failed to load GPU setting', err)
+      }
+    }
+    loadGpuSetting()
+  }, [])
+
+  useEffect(() => {
+    async function fetchStatus() {
+      try {
+        const status = await getGPUStatus()
+        setGpuStatus(status)
+        if (status.status === 'installing') {
+          setIsPollingGpu(true)
+        }
+      } catch (err) {
+        console.error('Failed to load GPU status', err)
+      }
+    }
+    fetchStatus()
+  }, [])
+
+  useEffect(() => {
+    let timer: number
+    if (isPollingGpu) {
+      timer = window.setInterval(async () => {
+        try {
+          const status = await getGPUStatus()
+          setGpuStatus(status)
+          if (status.status !== 'installing') {
+            setIsPollingGpu(false)
+            if (status.status === 'ready') {
+              toast.success('GPU Acceleration is ready!')
+            } else if (status.status === 'failed') {
+              toast.error('GPU Acceleration installation failed.')
+            }
+          }
+        } catch (err) {
+          console.error('Error polling GPU status', err)
+        }
+      }, 2000)
+    }
+    return () => clearInterval(timer)
+  }, [isPollingGpu])
+
+  const handleToggleGpu = async (checked: boolean) => {
+    setGpuEnabled(checked)
+    try {
+      await toggleGPU(checked)
+      toast.success(`GPU Acceleration ${checked ? 'enabled' : 'disabled'}`)
+      if (checked && (!gpuStatus || gpuStatus.status === 'not_installed' || gpuStatus.status === 'failed')) {
+        await installGPU()
+        setIsPollingGpu(true)
+        toast.info('Installation started...')
+      }
+    } catch (err) {
+      toast.error('Failed to toggle GPU acceleration')
+      setGpuEnabled(!checked)
+    }
+  }
+
 
   const handleSave = async () => {
     const result = await save.mutate(form)
@@ -306,6 +391,99 @@ export function SettingsPage() {
             </div>
           )}
 
+          {/* GPU Acceleration Section */}
+          <div className="space-y-4 pt-6 border-t border-border/20">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h3 className="text-xs font-bold tracking-widest text-muted-foreground/80 uppercase flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-primary" />
+                  GPU Acceleration
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
+                  Accelerate layout detection, OCR, and table extraction using your system's NVIDIA GPU (via CUDA).
+                </p>
+              </div>
+              {/* Toggle Switch */}
+              <div className="flex items-center gap-3">
+                {gpuStatus?.status === 'ready' && (
+                  <Badge variant="success" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
+                    Ready
+                  </Badge>
+                )}
+                {gpuStatus?.status === 'installing' && (
+                  <Badge variant="processing" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
+                    Installing {gpuStatus.progress}%
+                  </Badge>
+                )}
+                {gpuStatus?.status === 'failed' && (
+                  <Badge variant="destructive" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
+                    Verification Failed
+                  </Badge>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleToggleGpu(!gpuEnabled)}
+                  disabled={isPollingGpu}
+                  className={cn(
+                    'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                    gpuEnabled ? 'bg-primary' : 'bg-muted border-border/20',
+                    isPollingGpu && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                      gpuEnabled ? 'translate-x-5' : 'translate-x-0'
+                    )}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Installation Progress & Logs */}
+            {gpuEnabled && gpuStatus && gpuStatus.status !== 'not_installed' && (
+              <div className="space-y-3 p-4 rounded-xl border border-border/50 bg-card/45 animate-fade-in">
+                {/* Progress and status message */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground">
+                      {gpuStatus.status === 'installing' && 'Downloading & Installing Backend Components...'}
+                      {gpuStatus.status === 'ready' && 'GPU Acceleration is active and verified.'}
+                      {gpuStatus.status === 'failed' && 'Installation failed.'}
+                    </span>
+                    <span className="font-semibold text-muted-foreground">{gpuStatus.progress}%</span>
+                  </div>
+                  <Progress value={gpuStatus.progress} className="h-1.5" />
+                </div>
+
+                {/* Error message */}
+                {gpuStatus.status === 'failed' && gpuStatus.error_message && (
+                  <div className="text-xs text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20 leading-relaxed">
+                    <strong className="font-semibold">Error:</strong> {gpuStatus.error_message}
+                    <button
+                      onClick={() => handleToggleGpu(true)}
+                      className="ml-3 underline text-primary hover:text-primary/80 font-semibold uppercase tracking-wider text-[10px]"
+                    >
+                      Retry Installation
+                    </button>
+                  </div>
+                )}
+
+                {/* Log messages */}
+                {gpuStatus.logs && gpuStatus.logs.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase">Installation Logs</div>
+                    <div className="h-40 overflow-y-auto p-3 bg-black/60 rounded-lg text-[11px] font-mono text-emerald-400 border border-border/10 space-y-1 select-text scrollbar-thin font-semibold">
+                      {gpuStatus.logs.map((log, i) => (
+                        <div key={i} className="whitespace-pre-wrap leading-relaxed">{log}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
       </div>
 
       {/* Form Action Controls */}
@@ -342,3 +520,4 @@ export function SettingsPage() {
     </div>
   )
 }
+

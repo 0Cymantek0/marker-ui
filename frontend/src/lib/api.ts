@@ -355,3 +355,29 @@ export async function cancelModelsDownload(): Promise<{ status: string }> {
 export async function retryModelsDownload(): Promise<{ status: string }> {
   return request<{ status: string }>('/models/retry', { method: 'POST' })
 }
+
+// ─── GPU Acceleration ──────────────────────────────────────────────────
+
+export interface GPUStatus {
+  status: 'not_installed' | 'installing' | 'ready' | 'failed'
+  progress: number
+  logs: string[]
+  error_message: string | null
+  cuda_available: boolean
+}
+
+export async function getGPUStatus(): Promise<GPUStatus> {
+  return request<GPUStatus>('/settings/gpu/status')
+}
+
+export async function installGPU(): Promise<GPUStatus> {
+  return request<GPUStatus>('/settings/gpu/install', { method: 'POST' })
+}
+
+export async function toggleGPU(enabled: boolean): Promise<{ status: string; enabled: boolean }> {
+  return request<{ status: string; enabled: boolean }>('/settings/gpu/toggle', {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
