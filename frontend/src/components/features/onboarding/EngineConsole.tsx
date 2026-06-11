@@ -54,30 +54,30 @@ export function EngineConsole({
   const isCompleted = overall.status === 'completed' || status.initialized
   const isFailed = overall.status === 'failed'
 
-  let indicatorColor = 'bg-slate-700'
+  let indicatorColor = 'bg-muted'
   if (isCompleted) {
-    indicatorColor = 'bg-gradient-to-r from-emerald-500 to-teal-500'
+    indicatorColor = 'bg-primary'
   } else if (isDownloading) {
-    indicatorColor = 'bg-gradient-to-r from-violet-500 to-indigo-500'
+    indicatorColor = 'bg-primary/60'
   } else if (isLoading) {
-    indicatorColor = 'bg-gradient-to-r from-amber-500 to-orange-500'
+    indicatorColor = 'bg-primary/40'
   } else if (isFailed) {
-    indicatorColor = 'bg-gradient-to-r from-rose-500 to-red-500'
+    indicatorColor = 'bg-destructive'
   }
 
   return (
     <div className="space-y-8 select-none">
       {/* Title Header */}
-      <div className="space-y-3 pb-6 border-b border-slate-800/60">
+      <div className="space-y-3 pb-6 border-b border-border/40">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl shadow-lg shadow-violet-500/10">
-            <Database className="h-5.5 w-5.5 text-white" />
+          <div className="p-2 bg-secondary rounded-xl">
+            <Database className="h-5 w-5 text-foreground/80" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
             One-Time Setup
           </h1>
         </div>
-        <p className="text-slate-400 text-xs md:text-sm leading-relaxed max-w-md">
+        <p className="text-muted-foreground text-xs md:text-sm leading-relaxed max-w-sm">
           Marker requires localized AI models to execute document conversion and layout extraction.
           We are setting up your local environment.
         </p>
@@ -86,34 +86,34 @@ export function EngineConsole({
       {/* Main Status & Large Meter */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500">
+          <span className="text-[10px] uppercase tracking-wider font-extrabold text-muted-foreground/60">
             Overall Setup Progress
           </span>
-          <div>
+          <div className="flex items-center gap-2">
             {isCompleted && (
-              <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-bold text-xs">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Ready
-              </Badge>
+              <div className="flex items-center gap-1.5 text-foreground/80 font-bold text-xs">
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Ready
+              </div>
             )}
             {isDownloading && (
-              <Badge className="bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-bold text-xs animate-pulse">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Downloading
-              </Badge>
+              <div className="flex items-center gap-1.5 text-foreground/60 font-bold text-xs">
+                <span className="animate-shimmer text-foreground inline-block">Downloading Assets</span>
+              </div>
             )}
             {isLoading && (
-              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-bold text-xs animate-pulse">
-                <Cpu className="h-3.5 w-3.5 animate-spin" /> Initializing Engine
-              </Badge>
+              <div className="flex items-center gap-1.5 text-foreground/60 font-bold text-xs">
+                <span className="animate-shimmer text-foreground inline-block">Initializing Engine</span>
+              </div>
             )}
             {isFailed && (
-              <Badge className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-bold text-xs">
+              <div className="flex items-center gap-1.5 text-destructive font-bold text-xs uppercase tracking-tight">
                 <XCircle className="h-3.5 w-3.5" /> Interrupted
-              </Badge>
+              </div>
             )}
             {isPending && (
-              <Badge className="bg-slate-900 text-slate-400 border border-slate-800 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-bold text-xs">
+              <div className="flex items-center gap-1.5 text-muted-foreground font-bold text-xs uppercase tracking-tight">
                 <Download className="h-3.5 w-3.5" /> Waiting
-              </Badge>
+              </div>
             )}
           </div>
         </div>
@@ -121,41 +121,38 @@ export function EngineConsole({
         {/* Big visual number and speed/ETA statistics HUD */}
         <div className="flex items-baseline justify-between gap-4">
           <div className="flex items-baseline gap-2">
-            <span className="text-6xl font-black tracking-tighter font-mono text-slate-200">
+            <span className="text-6xl font-black tracking-tighter font-mono text-foreground">
               {overall.progress}%
             </span>
             {isDownloading && (
-              <span className="text-xs text-slate-500 font-mono">
-                ({formatBytes(overall.downloaded_bytes)} of {formatBytes(overall.total_bytes)})
+              <span className="text-[10px] text-muted-foreground/60 font-mono">
+                {formatBytes(overall.downloaded_bytes)} / {formatBytes(overall.total_bytes)}
               </span>
             )}
           </div>
 
           {isDownloading && (
-            <div className="flex items-center gap-4 bg-slate-950/40 border border-slate-900/60 rounded-lg px-3 py-1.5 font-mono text-[10px] leading-tight">
+            <div className="flex items-center gap-3 bg-secondary/50 border border-border/40 rounded-lg px-2.5 py-1.5 font-mono text-[10px] leading-tight">
               <div>
-                <span className="text-slate-500 block uppercase font-extrabold text-[8px]">Speed</span>
-                <span className="text-violet-400 font-bold">{overall.speed.toFixed(1)} MB/s</span>
+                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[8px]">Speed</span>
+                <span className="text-foreground/80 font-bold">{overall.speed.toFixed(1)} MB/s</span>
               </div>
-              <div className="w-px h-5.5 bg-slate-800" />
+              <div className="w-px h-4 bg-border/40" />
               <div>
-                <span className="text-slate-500 block uppercase font-extrabold text-[8px]">Time</span>
-                <span className="text-violet-400 font-bold">{formatETA(overall.eta)}</span>
+                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[8px]">Time</span>
+                <span className="text-foreground/80 font-bold">{formatETA(overall.eta)}</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Elegant thin progress bar with glowing blur shadow */}
+        {/* Elegant thin progress bar */}
         <div className="relative pt-1 select-none">
           <Progress
             value={overall.progress}
-            className="h-1 bg-slate-800/60 rounded-full"
+            className="h-1 bg-secondary rounded-full"
             indicatorClassName={indicatorColor}
           />
-          {isDownloading && (
-            <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-indigo-500/20 blur-sm rounded-full -z-10" />
-          )}
         </div>
       </div>
 
@@ -166,11 +163,11 @@ export function EngineConsole({
             variant="outline"
             onClick={handleCancel}
             disabled={isCancelling}
-            className="w-full md:w-auto border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900 text-slate-400 hover:text-slate-200 px-5 py-2 h-10 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+            className="w-full md:w-auto border-border/60 hover:border-border bg-transparent text-muted-foreground hover:text-foreground px-5 py-2 h-9 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
           >
             {isCancelling ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Cancelling
+                <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> Cancelling
               </>
             ) : (
               'Cancel Setup'
@@ -182,15 +179,15 @@ export function EngineConsole({
           <Button
             onClick={handleRetry}
             disabled={isRetrying}
-            className="w-full md:w-auto bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-xl px-5 py-2 h-10 shadow-lg shadow-violet-600/15 text-xs uppercase tracking-wider transition-all"
+            className="w-full md:w-auto bg-primary text-primary-foreground font-bold rounded-lg px-5 py-2 h-9 text-[10px] uppercase tracking-wider transition-all"
           >
             {isRetrying ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Starting...
+                <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> Starting...
               </>
             ) : (
               <>
-                <Play className="h-3.5 w-3.5 mr-1.5" /> Restart Setup
+                <Play className="h-3 w-3 mr-1.5 fill-current" /> Restart Setup
               </>
             )}
           </Button>
@@ -199,9 +196,9 @@ export function EngineConsole({
         {isCompleted && (
           <Button
             onClick={onComplete}
-            className="w-full md:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-xl px-5 py-2 h-10 shadow-lg shadow-emerald-500/10 text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all duration-300"
+            className="w-full md:w-auto bg-foreground text-background hover:bg-foreground/90 font-bold rounded-lg px-5 py-2 h-9 text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
           >
-            Continue to Workspace <ArrowRight className="h-4 w-4" />
+            Continue to Workspace <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>

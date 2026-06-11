@@ -12,13 +12,14 @@ interface SelectProps {
   onChange: (value: string) => void
   options: SelectOption[]
   className?: string
+  disabled?: boolean
 }
 
-export function Select({ value, onChange, options, className }: SelectProps) {
+export function Select({ value, onChange, options, className, disabled }: SelectProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
-  const selectedOption = options.find((opt) => opt.value === value) || options[0]
+  const selectedOption = options.find((opt) => opt.value === value)
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -34,13 +35,15 @@ export function Select({ value, onChange, options, className }: SelectProps) {
     <div ref={containerRef} className={cn('relative w-full md:w-44', className)}>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex items-center justify-between w-full px-3 py-2 bg-background/40 hover:bg-muted/30 border border-border/50 rounded-lg text-xs font-semibold text-foreground transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-primary text-left',
-          isOpen && 'ring-1 ring-primary border-primary/40 bg-muted/20'
+          'flex items-center justify-between w-full px-3 py-2 bg-background/40 hover:bg-muted/30 border border-border/50 rounded-lg text-xs font-semibold text-foreground transition-all duration-200 focus:outline-none text-left h-10',
+          isOpen && 'bg-muted/20',
+          disabled && 'opacity-50 cursor-not-allowed pointer-events-none'
         )}
       >
-        <span className="truncate">{selectedOption?.label}</span>
+        <span className="truncate">{selectedOption?.label || 'Select option...'}</span>
         <ChevronDown 
           className={cn(
             'w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 shrink-0 ml-2', 
@@ -49,8 +52,8 @@ export function Select({ value, onChange, options, className }: SelectProps) {
         />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1.5 origin-top-right rounded-lg border border-border/50 bg-background/95 backdrop-blur-md shadow-lg py-1 max-h-60 overflow-y-auto focus:outline-none animate-in fade-in slide-in-from-top-1 duration-100">
+      {isOpen && !disabled && (
+        <div className="absolute z-50 w-full mt-1.5 origin-top-right rounded-lg border border-border bg-background shadow-lg py-1 max-h-60 overflow-y-auto focus:outline-none animate-in fade-in slide-in-from-top-1 duration-100">
           {options.map((option) => {
             const isSelected = option.value === value
             return (

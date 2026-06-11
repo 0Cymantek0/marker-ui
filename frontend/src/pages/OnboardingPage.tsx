@@ -91,9 +91,9 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
 
   if (!status) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-6 select-none font-sans">
-        <Loader2 className="h-8 w-8 text-violet-500 animate-spin mb-4" />
-        <p className="text-slate-400 font-medium text-xs uppercase tracking-wider">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-6 select-none font-sans">
+        <Loader2 className="h-8 w-8 text-primary/40 animate-spin mb-4" />
+        <p className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
           Connecting to Marker engine...
         </p>
       </div>
@@ -103,12 +103,12 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const isFailed = status.overall.status === 'failed'
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 md:p-8 overflow-hidden font-sans">
+    <div className="relative min-h-screen bg-background text-foreground flex items-center justify-center p-4 md:p-8 overflow-hidden font-sans">
       {showConfetti && <CanvasConfetti />}
 
-      {/* Ambient background glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/5 rounded-full blur-[100px] -z-10 animate-pulse duration-[8000ms]" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-[100px] -z-10 animate-pulse duration-[6000ms]" />
+      {/* Ambient background glows - subtle neutral ones */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] -z-10 animate-pulse duration-[8000ms]" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-muted/10 rounded-full blur-[100px] -z-10 animate-pulse duration-[6000ms]" />
 
       <div className="w-full max-w-6xl space-y-8 relative py-6 md:py-10 px-4 md:px-6">
         {/* Failed / Interrupt Alert banner */}

@@ -326,19 +326,46 @@ def test_build_marker_options_model_override():
     """Verify that build_marker_options correctly overrides model names for all services."""
     from app.services.marker_service import build_marker_options
 
-    # Gemini
-    gemini_cfg = {"llm_service": "gemini", "gemini_model_name": "gemini-2.0-flash"}
-    opts = build_marker_options(gemini_cfg, {"llm_model": "gemini-1.5-pro"})
+    llm_cfg = {
+        "providers": [
+            {
+                "id": "gemini",
+                "type": "gemini",
+                "label": "Gemini",
+                "api_key": "gemini-key",
+                "models": [{"model_id": "gemini-2.0-flash"}, {"model_id": "gemini-1.5-pro"}]
+            },
+            {
+                "id": "claude",
+                "type": "claude",
+                "label": "Claude",
+                "api_key": "claude-key",
+                "models": [{"model_id": "claude-3-7-sonnet"}, {"model_id": "claude-3-5-haiku"}]
+            },
+            {
+                "id": "openai",
+                "type": "openai",
+                "label": "OpenAI",
+                "api_key": "openai-key",
+                "models": [{"model_id": "gpt-4o-mini"}, {"model_id": "gpt-4o"}]
+            }
+        ],
+        "active": {
+            "provider_id": "gemini",
+            "model_id": "gemini-2.0-flash"
+        }
+    }
+
+    # Gemini Override
+    opts = build_marker_options(llm_cfg, {"use_llm": True, "llm_provider": "gemini", "llm_model": "gemini-1.5-pro"})
     assert opts["gemini_model_name"] == "gemini-1.5-pro"
 
-    # Claude
-    claude_cfg = {"llm_service": "claude", "claude_model_name": "claude-3-7-sonnet"}
-    opts = build_marker_options(claude_cfg, {"llm_model": "claude-3-5-haiku"})
+    # Claude Override
+    opts = build_marker_options(llm_cfg, {"use_llm": True, "llm_provider": "claude", "llm_model": "claude-3-5-haiku"})
     assert opts["claude_model_name"] == "claude-3-5-haiku"
 
-    # OpenAI
-    openai_cfg = {"llm_service": "openai", "openai_model": "gpt-4o-mini"}
-    opts = build_marker_options(openai_cfg, {"llm_model": "gpt-4o"})
+    # OpenAI Override
+    opts = build_marker_options(llm_cfg, {"use_llm": True, "llm_provider": "openai", "llm_model": "gpt-4o"})
     assert opts["openai_model"] == "gpt-4o"
 
 
@@ -366,8 +393,22 @@ def test_build_marker_options_advanced_settings():
     """Verify that build_marker_options correctly includes page_range and lang."""
     from app.services.marker_service import build_marker_options
 
-    llm_cfg = {"llm_service": "gemini", "gemini_model_name": "gemini-2.0-flash"}
-    conv_cfg = {"page_range": "1-5", "lang": "es"}
+    llm_cfg = {
+        "providers": [
+            {
+                "id": "gemini",
+                "type": "gemini",
+                "label": "Gemini",
+                "api_key": "gemini-key",
+                "models": [{"model_id": "gemini-2.0-flash"}]
+            }
+        ],
+        "active": {
+            "provider_id": "gemini",
+            "model_id": "gemini-2.0-flash"
+        }
+    }
+    conv_cfg = {"use_llm": True, "page_range": "1-5", "lang": "es"}
     opts = build_marker_options(llm_cfg, conv_cfg)
 
     assert opts["page_range"] == "1-5"

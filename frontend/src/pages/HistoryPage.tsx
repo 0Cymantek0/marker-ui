@@ -253,7 +253,7 @@ export function HistoryPage() {
             placeholder="Search filename..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-background/40 border-border/50 h-9 text-xs"
+            className="pl-9 bg-background/40 border-border/50 text-xs"
           />
         </div>
 

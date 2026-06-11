@@ -38,24 +38,7 @@ def _get_or_create_key() -> bytes:
     return base64.urlsafe_b64decode(key)
 
 
-def encrypt_value(plaintext: str) -> str:
-    """Encrypt a plaintext string. Returns plaintext if cryptography not installed."""
-    if not HAS_CRYPTO or not plaintext:
-        return plaintext
-    key = _get_or_create_key()
-    return Fernet(base64.urlsafe_b64encode(key)).encrypt(plaintext.encode()).decode()
-
-
-def decrypt_value(ciphertext: str) -> str:
-    """Decrypt a ciphertext string. Returns as-is if cryptography not installed."""
-    if not HAS_CRYPTO or not ciphertext:
-        return ciphertext
-    try:
-        key = _get_or_create_key()
-        return Fernet(base64.urlsafe_b64encode(key)).decrypt(ciphertext.encode()).decode()
-    except Exception:
-        # If decryption fails, assume it's plaintext (migration path)
-        return ciphertext
+from app.crypto import encrypt_value, decrypt_value
 
 
 def is_sensitive_key(key: str) -> bool:

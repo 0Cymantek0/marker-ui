@@ -22,6 +22,10 @@ from app.models.schemas import (
     SettingsUpdateRequest,
     GPUStatusResponse,
     GPUToggleRequest,
+    ModelConfig,
+    LLMProvider,
+    ActiveLLM,
+    FetchModelsRequest,
 )
 from app.utils.secrets import (
     decrypt_value,
@@ -240,27 +244,51 @@ _LLM_SENSITIVE_KEYS = {
 async def get_llm_config(
     db: AsyncSession = Depends(get_db),
 ) -> LLMConfig:
-    """Return the full LLM configuration assembled from individual settings."""
-    stmt = select(Setting).where(Setting.category == "llm")
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
+    """Return the full LLM configuration assembled from individual settings (legacy fallback)."""
+    active = await get_active_llm(db)
+    providers = await get_llm_providers(db)
+    active_prov = next((p for p in providers if p.id == active.provider_id), None)
 
-    data: dict[str, Any] = {}
-    for r in rows:
-        raw = r.value
-        try:
-            parsed = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            parsed = raw
-        # Decrypt sensitive keys
-        if r.key in _LLM_SENSITIVE_KEYS and isinstance(parsed, str):
-            parsed = decrypt_value(parsed)
-        data[r.key] = parsed
+    data = {
+        "llm_service": "no_llm" if active.provider_id == "none" else active.provider_id,
+        "timeout": 60,
+        "max_retries": 3,
+        "max_output_tokens": 4096
+    }
 
-    # Mask sensitive values in response
-    for k in _LLM_SENSITIVE_KEYS:
-        if k in data and data[k]:
-            data[k] = mask_value(data[k])
+    if active_prov:
+        api_key = active_prov.api_key
+        model_id = active.model_id
+        base_url = active_prov.base_url
+
+        model_cfg = next((m for m in active_prov.models if m.model_id == model_id), None)
+        if model_cfg:
+            if model_cfg.timeout: data["timeout"] = model_cfg.timeout
+            if model_cfg.max_retries: data["max_retries"] = model_cfg.max_retries
+            if model_cfg.max_output_tokens: data["max_output_tokens"] = model_cfg.max_output_tokens
+
+        p_type = active_prov.type
+        if p_type == "gemini":
+            data["gemini_api_key"] = api_key
+            data["gemini_model_name"] = model_id
+        elif p_type == "claude":
+            data["claude_api_key"] = api_key
+            data["claude_model_name"] = model_id
+        elif p_type in ("openai", "custom_openai"):
+            data["openai_api_key"] = api_key
+            data["openai_base_url"] = base_url
+            data["openai_model"] = model_id
+        elif p_type == "ollama":
+            data["ollama_base_url"] = base_url
+            data["ollama_model"] = model_id
+        elif p_type == "azure":
+            data["azure_api_key"] = api_key
+            data["azure_endpoint"] = base_url
+            data["azure_deployment_name"] = model_id
+        elif p_type == "vertex":
+            data["vertex_project_id"] = api_key
+            data["vertex_location"] = base_url
+            data["gemini_model_name"] = model_id
 
     return LLMConfig(**{k: v for k, v in data.items() if k in LLMConfig.model_fields})
 
@@ -270,52 +298,63 @@ async def save_llm_config(
     body: LLMConfig,
     db: AsyncSession = Depends(get_db),
 ) -> LLMConfig:
-    """Persist the full LLM configuration as individual settings."""
-    data = body.model_dump(exclude_none=True)
+    """Persist the legacy LLM configuration by mapping it to new providers list."""
+    service = body.llm_service
+    provider_id = "none" if service == "no_llm" else service.value
 
-    for key, value in data.items():
-        from enum import Enum
-        serialized: str
-        if isinstance(value, Enum):
-            serialized = value.value
-        elif isinstance(value, (dict, list)):
-            serialized = json.dumps(value)
+    providers = await get_llm_providers(db)
+    active_prov = next((p for p in providers if p.id == provider_id), None)
+
+    model_id = ""
+    if provider_id == "gemini":
+        model_id = body.gemini_model_name or "gemini-2.0-flash"
+        if active_prov:
+            if body.gemini_api_key: active_prov.api_key = body.gemini_api_key
+    elif provider_id == "claude":
+        model_id = body.claude_model_name or "claude-3-7-sonnet-20250219"
+        if active_prov:
+            if body.claude_api_key: active_prov.api_key = body.claude_api_key
+    elif provider_id == "openai":
+        model_id = body.openai_model or "gpt-4o-mini"
+        if active_prov:
+            if body.openai_api_key: active_prov.api_key = body.openai_api_key
+            if body.openai_base_url: active_prov.base_url = body.openai_base_url
+    elif provider_id == "ollama":
+        model_id = body.ollama_model or "llama3.2-vision"
+        if active_prov:
+            if body.ollama_base_url: active_prov.base_url = body.ollama_base_url
+    elif provider_id == "azure":
+        model_id = body.azure_deployment_name or "gpt-4o"
+        if active_prov:
+            if body.azure_api_key: active_prov.api_key = body.azure_api_key
+            if body.azure_endpoint: active_prov.base_url = body.azure_endpoint
+    elif provider_id == "vertex":
+        model_id = body.gemini_model_name or "gemini-2.0-flash"
+        if active_prov:
+            if body.vertex_project_id: active_prov.api_key = body.vertex_project_id
+            if body.vertex_location: active_prov.base_url = body.vertex_location
+
+    if active_prov:
+        model_cfg = next((m for m in active_prov.models if m.model_id == model_id), None)
+        if not model_cfg:
+            active_prov.models.append(ModelConfig(
+                model_id=model_id,
+                timeout=body.timeout,
+                max_retries=body.max_retries,
+                max_output_tokens=body.max_output_tokens
+            ))
         else:
-            serialized = str(value)
+            model_cfg.timeout = body.timeout
+            model_cfg.max_retries = body.max_retries
+            model_cfg.max_output_tokens = body.max_output_tokens
 
-        # For sensitive keys: if masked, keep existing encrypted value
-        if key in _LLM_SENSITIVE_KEYS and is_masked(serialized):
-            stmt = select(Setting).where(Setting.key == key)
-            result = await db.execute(stmt)
-            existing = result.scalar_one_or_none()
-            if existing:
-                # Keep the existing encrypted value, skip update
-                continue
-            # No existing row but value is masked — nothing to save
-            continue
-        elif key in _LLM_SENSITIVE_KEYS and serialized:
-            from app.core.api_manager import update_secret_cache
-            update_secret_cache(key, serialized)
-            serialized = encrypt_value(serialized)
+    # Save changes using save_llm_providers (handles encrypt/mask/cache refresh)
+    await save_llm_providers(providers, db)
 
-        stmt = select(Setting).where(Setting.key == key)
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
+    # Save global active
+    await save_active_llm(ActiveLLM(provider_id=provider_id, model_id=model_id), db)
 
-        if row:
-            row.value = serialized
-            row.category = "llm"
-        else:
-            db.add(Setting(key=key, value=serialized, category="llm"))
-
-    await db.flush()
-
-    # Return masked version
-    response_data = dict(data)
-    for k in _LLM_SENSITIVE_KEYS:
-        if k in response_data and response_data[k]:
-            response_data[k] = mask_value(str(response_data[k]))
-    return LLMConfig(**{k: v for k, v in response_data.items() if k in LLMConfig.model_fields})
+    return await get_llm_config(db)
 
 
 # ------------------------------------------------------------------
@@ -400,7 +439,9 @@ async def test_llm_connection(
                 update_secret_cache("claude_api_key", api_key)
                 api_key = "secret:claude_api_key"
 
-            url = "https://api.anthropic.com/v1/messages"
+            base_url = body.openai_base_url or "https://api.anthropic.com/v1"
+            validate_llm_url(base_url)
+            url = f"{base_url.rstrip('/')}/messages"
             headers = {
                 "x-api-key": api_key,
                 "anthropic-version": "2023-06-01",
@@ -550,5 +591,451 @@ async def toggle_gpu(
         db.add(Setting(key="gpu_acceleration_enabled", value=val, category="gpu"))
     await db.commit()
     return {"status": "success", "enabled": body.enabled}
+
+
+# ------------------------------------------------------------------
+# LLM Providers Configuration & Endpoints
+# ------------------------------------------------------------------
+
+async def init_llm_providers_if_missing(db: AsyncSession) -> None:
+    """Ensure LLM providers and active LLM configuration exist in the database."""
+    stmt = select(Setting).where(Setting.key == "llm_providers")
+    res = await db.execute(stmt)
+    row = res.scalar_one_or_none()
+
+    # Load legacy settings if present
+    stmt = select(Setting).where(Setting.category == "llm")
+    res = await db.execute(stmt)
+    rows = res.scalars().all()
+    old_settings = {r.key: r.value for r in rows}
+
+    def get_old(key: str, default: Any = "") -> Any:
+        val = old_settings.get(key, default)
+        if key in _LLM_SENSITIVE_KEYS and val:
+            val = decrypt_value(val)
+        return val
+
+    timeout = int(get_old("timeout", 60) or 60)
+    max_retries = int(get_old("max_retries", 3) or 3)
+    max_output = int(get_old("max_output_tokens", 4096) or 4096)
+
+    default_providers = [
+        {
+            "id": "gemini",
+            "type": "gemini",
+            "label": "Gemini",
+            "api_key": encrypt_value(get_old("gemini_api_key")) if get_old("gemini_api_key") else None,
+            "fallback_api_keys": [],
+            "models": [
+                {"model_id": get_old("gemini_model_name") or "gemini-2.0-flash", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output},
+                {"model_id": "gemini-2.0-pro-exp-02-05", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output}
+            ]
+        },
+        {
+            "id": "claude",
+            "type": "claude",
+            "label": "Claude",
+            "api_key": encrypt_value(get_old("claude_api_key")) if get_old("claude_api_key") else None,
+            "fallback_api_keys": [],
+            "models": [
+                {"model_id": get_old("claude_model_name") or "claude-3-7-sonnet-20250219", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output},
+                {"model_id": "claude-3-5-sonnet-20241022", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output}
+            ]
+        },
+        {
+            "id": "openai",
+            "type": "openai",
+            "label": "OpenAI",
+            "api_key": encrypt_value(get_old("openai_api_key")) if get_old("openai_api_key") else None,
+            "base_url": get_old("openai_base_url") or "https://api.openai.com/v1",
+            "fallback_api_keys": [],
+            "models": [
+                {"model_id": get_old("openai_model") or "gpt-4o-mini", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output},
+                {"model_id": "gpt-4o", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output}
+            ]
+        },
+        {
+            "id": "ollama",
+            "type": "ollama",
+            "label": "Ollama",
+            "base_url": get_old("ollama_base_url") or "http://localhost:11434",
+            "fallback_api_keys": [],
+            "models": [
+                {"model_id": get_old("ollama_model") or "llama3.2-vision", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output}
+            ]
+        },
+        {
+            "id": "azure",
+            "type": "azure",
+            "label": "Azure OpenAI",
+            "api_key": encrypt_value(get_old("azure_api_key")) if get_old("azure_api_key") else None,
+            "base_url": get_old("azure_endpoint") or "",
+            "fallback_api_keys": [],
+            "models": [
+                {"model_id": get_old("azure_deployment_name") or "gpt-4o", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output}
+            ]
+        },
+        {
+            "id": "vertex",
+            "type": "vertex",
+            "label": "Vertex AI",
+            "api_key": encrypt_value(get_old("vertex_project_id")) if get_old("vertex_project_id") else None,
+            "base_url": get_old("vertex_location") or "us-central1",
+            "fallback_api_keys": [],
+            "models": [
+                {"model_id": get_old("gemini_model_name") or "gemini-2.0-flash", "timeout": timeout, "max_retries": max_retries, "max_output_tokens": max_output}
+            ]
+        }
+    ]
+
+    existing_providers = []
+    if row:
+        try:
+            existing_providers = json.loads(row.value)
+        except Exception:
+            pass
+
+    existing_ids = {p["id"] for p in existing_providers if "id" in p}
+    needs_save = False
+
+    if not row:
+        existing_providers = default_providers
+        needs_save = True
+    else:
+        for def_p in default_providers:
+            if def_p["id"] not in existing_ids:
+                existing_providers.append(def_p)
+                needs_save = True
+
+    if needs_save:
+        serialized = json.dumps(existing_providers)
+        if row:
+            row.value = serialized
+        else:
+            db.add(Setting(key="llm_providers", value=serialized, category="llm"))
+        await db.flush()
+
+    active_stmt = select(Setting).where(Setting.key == "llm_global_active")
+    active_res = await db.execute(active_stmt)
+    active_row = active_res.scalar_one_or_none()
+
+    if not active_row:
+        active_service = get_old("llm_service") or "no_llm"
+        if active_service == "no_llm":
+            active_provider = "none"
+            active_model = ""
+        else:
+            active_provider = active_service
+            prov_obj = next((p for p in existing_providers if p["id"] == active_provider), None)
+            active_model = prov_obj["models"][0]["model_id"] if prov_obj and prov_obj["models"] else ""
+
+        active_data = {"provider_id": active_provider, "model_id": active_model}
+        db.add(Setting(key="llm_global_active", value=json.dumps(active_data), category="llm"))
+
+    await db.commit()
+
+
+async def fetch_models_from_api(
+    provider_type: str,
+    base_url: str | None,
+    api_key: str | None,
+) -> list[str]:
+    """Fetch available models list from a provider API endpoint."""
+    import httpx
+    timeout = httpx.Timeout(10.0, connect=3.0)
+
+    if provider_type in ("openai", "custom_openai"):
+        if not base_url:
+            base_url = "https://api.openai.com/v1"
+        url = f"{base_url.rstrip('/')}/models"
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.get(url, headers=headers)
+        res.raise_for_status()
+        data = res.json().get("data", [])
+        return sorted([m["id"] for m in data if "id" in m])
+
+    elif provider_type == "gemini":
+        url = "https://generativelanguage.googleapis.com/v1beta/models"
+        params = {}
+        if api_key:
+            params["key"] = api_key
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.get(url, params=params)
+        res.raise_for_status()
+        models = res.json().get("models", [])
+        return sorted([m["name"].split("/")[-1] for m in models if "name" in m])
+
+    elif provider_type in ("claude", "custom_anthropic"):
+        url_base = base_url or "https://api.anthropic.com/v1"
+        url = f"{url_base.rstrip('/')}/models"
+        headers = {
+            "anthropic-version": "2023-06-01",
+        }
+        if api_key:
+            headers["x-api-key"] = api_key
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.get(url, headers=headers)
+        res.raise_for_status()
+        data = res.json().get("data", [])
+        return sorted([m["id"] for m in data if "id" in m])
+
+    elif provider_type == "ollama":
+        if not base_url:
+            base_url = "http://localhost:11434"
+        url = f"{base_url.rstrip('/')}/api/tags"
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.get(url)
+        res.raise_for_status()
+        models = res.json().get("models", [])
+        model_ids = []
+        for m in models:
+            if "name" in m:
+                model_ids.append(m["name"])
+            elif "model" in m:
+                model_ids.append(m["model"])
+        return sorted(model_ids)
+
+    elif provider_type == "azure":
+        if not base_url:
+            return []
+        url = f"{base_url.rstrip('/')}/openai/deployments?api-version=2023-05-15"
+        headers = {}
+        if api_key:
+            headers["api-key"] = api_key
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.get(url, headers=headers)
+        res.raise_for_status()
+        deployments = res.json().get("data", [])
+        return sorted([d["id"] for d in deployments if "id" in d])
+
+    elif provider_type == "vertex":
+        import asyncio
+        from google import genai
+
+        def _list_vertex():
+            client = genai.Client(
+                vertexai=True,
+                project=api_key,  # project_id is passed as api_key
+                location=base_url or "us-central1",
+            )
+            models_pager = client.models.list()
+            model_ids = []
+            for m in models_pager:
+                name = m.name.split("/")[-1]
+                model_ids.append(name)
+            return sorted(list(set(model_ids)))
+
+        return await asyncio.to_thread(_list_vertex)
+
+    return []
+
+
+@router.get("/llm/providers", response_model=list[LLMProvider])
+async def get_llm_providers(
+    db: AsyncSession = Depends(get_db),
+) -> list[LLMProvider]:
+    """Get all configured LLM providers (keys masked)."""
+    stmt = select(Setting).where(Setting.key == "llm_providers")
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+
+    if not row:
+        await init_llm_providers_if_missing(db)
+        stmt = select(Setting).where(Setting.key == "llm_providers")
+        result = await db.execute(stmt)
+        row = result.scalar_one_or_none()
+
+    providers = []
+    if row:
+        providers = json.loads(row.value)
+
+    masked_list = []
+    for p in providers:
+        masked_list.append(LLMProvider(
+            id=p["id"],
+            type=p["type"],
+            label=p["label"],
+            base_url=p.get("base_url"),
+            api_key=mask_value(decrypt_value(p["api_key"])) if p.get("api_key") else None,
+            fallback_api_keys=[mask_value(decrypt_value(fb)) for fb in p.get("fallback_api_keys", [])],
+            models=[ModelConfig(**m) for m in p.get("models", [])]
+        ))
+    return masked_list
+
+
+@router.put("/llm/providers", response_model=list[LLMProvider])
+async def save_llm_providers(
+    body: list[LLMProvider],
+    db: AsyncSession = Depends(get_db),
+) -> list[LLMProvider]:
+    """Save the LLM providers list, encrypting sensitive keys."""
+    stmt = select(Setting).where(Setting.key == "llm_providers")
+    result = await db.execute(stmt)
+    existing_row = result.scalar_one_or_none()
+
+    existing_providers = []
+    if existing_row:
+        try:
+            existing_providers = json.loads(existing_row.value)
+        except Exception:
+            pass
+
+    existing_map = {}
+    for p in existing_providers:
+        pid = p.get("id")
+        if not pid:
+            continue
+        api_key = p.get("api_key")
+        if api_key:
+            api_key = decrypt_value(api_key)
+        fallback_keys = []
+        for fb in p.get("fallback_api_keys", []):
+            if fb:
+                fallback_keys.append(decrypt_value(fb))
+        existing_map[pid] = {"api_key": api_key, "fallback_api_keys": fallback_keys}
+
+    updated_providers = []
+    for p in body:
+        pid = p.id
+        p_type = p.type
+        p_label = p.label
+        base_url = p.base_url
+        models = [m.model_dump() for m in p.models]
+
+        api_key = p.api_key
+        if api_key and is_masked(api_key):
+            api_key = existing_map.get(pid, {}).get("api_key")
+
+        fallback_keys = []
+        existing_fallbacks = existing_map.get(pid, {}).get("fallback_api_keys", [])
+        for i, fb in enumerate(p.fallback_api_keys):
+            if fb and is_masked(fb):
+                if i < len(existing_fallbacks):
+                    fallback_keys.append(existing_fallbacks[i])
+            elif fb:
+                fallback_keys.append(fb)
+
+        encrypted_api_key = encrypt_value(api_key) if api_key else None
+        encrypted_fallback_keys = [encrypt_value(fb) for fb in fallback_keys]
+
+        updated_providers.append({
+            "id": pid,
+            "type": p_type,
+            "label": p_label,
+            "api_key": encrypted_api_key,
+            "fallback_api_keys": encrypted_fallback_keys,
+            "base_url": base_url,
+            "models": models
+        })
+
+    serialized = json.dumps(updated_providers)
+    if existing_row:
+        existing_row.value = serialized
+    else:
+        db.add(Setting(key="llm_providers", value=serialized, category="llm"))
+
+    await db.flush()
+    await db.commit()
+
+    from app.core.api_manager import load_secrets_from_db
+    await load_secrets_from_db()
+
+    masked_list = []
+    for p in updated_providers:
+        masked_list.append(LLMProvider(
+            id=p["id"],
+            type=p["type"],
+            label=p["label"],
+            base_url=p["base_url"],
+            api_key=mask_value(decrypt_value(p["api_key"])) if p["api_key"] else None,
+            fallback_api_keys=[mask_value(decrypt_value(fb)) for fb in p["fallback_api_keys"]],
+            models=[ModelConfig(**m) for m in p["models"]]
+        ))
+    return masked_list
+
+
+@router.get("/llm/active", response_model=ActiveLLM)
+async def get_active_llm(
+    db: AsyncSession = Depends(get_db),
+) -> ActiveLLM:
+    """Get the active global LLM settings."""
+    stmt = select(Setting).where(Setting.key == "llm_global_active")
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+
+    if not row:
+        await init_llm_providers_if_missing(db)
+        stmt = select(Setting).where(Setting.key == "llm_global_active")
+        result = await db.execute(stmt)
+        row = result.scalar_one_or_none()
+
+    if row:
+        data = json.loads(row.value)
+        return ActiveLLM(**data)
+
+    return ActiveLLM(provider_id="none", model_id="")
+
+
+@router.put("/llm/active", response_model=ActiveLLM)
+async def save_active_llm(
+    body: ActiveLLM,
+    db: AsyncSession = Depends(get_db),
+) -> ActiveLLM:
+    """Save the globally active LLM and sync with legacy settings."""
+    stmt = select(Setting).where(Setting.key == "llm_global_active")
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+
+    serialized = body.model_dump_json()
+    if row:
+        row.value = serialized
+    else:
+        db.add(Setting(key="llm_global_active", value=serialized, category="llm"))
+
+    legacy_service = "no_llm" if body.provider_id == "none" else body.provider_id
+    legacy_service_stmt = select(Setting).where(Setting.key == "llm_service")
+    legacy_service_row = (await db.execute(legacy_service_stmt)).scalar_one_or_none()
+    if legacy_service_row:
+        legacy_service_row.value = legacy_service
+    else:
+        db.add(Setting(key="llm_service", value=legacy_service, category="llm"))
+
+    await db.flush()
+    await db.commit()
+    return body
+
+
+@router.post("/llm/providers/fetch-models")
+async def fetch_provider_models(
+    body: FetchModelsRequest,
+    db: AsyncSession = Depends(get_db),
+) -> list[str]:
+    """Fetch model options directly from a provider's endpoint."""
+    api_key = body.api_key
+    base_url = body.base_url
+
+    if body.provider_id and (not api_key or is_masked(api_key) or not base_url):
+        stmt = select(Setting).where(Setting.key == "llm_providers")
+        result = await db.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row:
+            providers = json.loads(row.value)
+            prov = next((p for p in providers if p["id"] == body.provider_id), None)
+            if prov:
+                if not api_key or is_masked(api_key):
+                    api_key = decrypt_value(prov.get("api_key")) if prov.get("api_key") else None
+                if not base_url:
+                    base_url = prov.get("base_url")
+
+    try:
+        models = await fetch_models_from_api(body.type, base_url, api_key)
+        return models
+    except Exception as e:
+        logger.error("Error fetching models from provider: %s", e, exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Failed to fetch models: {str(e)}")
+
 
 

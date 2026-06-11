@@ -36,30 +36,27 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def _load_llm_config(db: AsyncSession) -> dict[str, Any]:
-    """Load stored LLM config from settings table.
-
-    Returns placeholder secret references (e.g. 'secret:key_name') for sensitive settings,
-    which are resolved in-flight by the api_manager interceptor.
-    """
+    """Load stored LLM providers and active LLM configuration."""
     from app.models.settings import Setting
-    from app.crypto import is_encrypted_field
+    from app.routes.settings import init_llm_providers_if_missing
     import json
 
-    stmt = select(Setting).where(Setting.category == "llm")
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
+    stmt = select(Setting).where(Setting.key == "llm_providers")
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if not row:
+        await init_llm_providers_if_missing(db)
+        row = (await db.execute(stmt)).scalar_one_or_none()
 
-    data: dict[str, Any] = {}
-    for r in rows:
-        try:
-            parsed = json.loads(r.value)
-        except (json.JSONDecodeError, TypeError):
-            parsed = r.value
-        # Use placeholder for sensitive keys
-        if is_encrypted_field(r.key):
-            parsed = f"secret:{r.key}"
-        data[r.key] = parsed
-    return data
+    providers = json.loads(row.value) if row else []
+
+    stmt = select(Setting).where(Setting.key == "llm_global_active")
+    active_row = (await db.execute(stmt)).scalar_one_or_none()
+    active = json.loads(active_row.value) if active_row else {"provider_id": "none", "model_id": ""}
+
+    return {
+        "providers": providers,
+        "active": active
+    }
 
 
 # ------------------------------------------------------------------
@@ -75,6 +72,7 @@ async def upload_file(
     output_format: str = Query("markdown", description="Output format: markdown, json, html, chunks"),
     converter: Optional[str] = Query(None, description="Converter class: PdfConverter, TableConverter, OCRConverter"),
     use_llm: bool = Query(False, description="Enable LLM-assisted conversion"),
+    llm_provider: Optional[str] = Query(None, description="LLM provider ID override"),
     llm_model: Optional[str] = Query(None, description="LLM model name override"),
     force_ocr: bool = Query(False, description="Force OCR on all pages"),
     paginate_output: bool = Query(False, description="Add page separators in output"),
@@ -167,6 +165,8 @@ async def upload_file(
         config["converter_cls"] = converter
     if use_llm:
         config["use_llm"] = True
+    if llm_provider:
+        config["llm_provider"] = llm_provider
     if llm_model:
         config["llm_model"] = llm_model
     if force_ocr:

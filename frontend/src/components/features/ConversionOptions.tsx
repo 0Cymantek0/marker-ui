@@ -1,11 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { FileText, Code, Braces, Layers, HelpCircle, Settings2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import type { ConversionConfig, OutputFormat, ConverterType } from '@/lib/api'
+import { Select } from '@/components/ui/select'
+import {
+  getLLMProviders,
+  getActiveLLM,
+  type LLMProvider,
+  type ConversionConfig,
+  type OutputFormat,
+  type ConverterType,
+  type ActiveLLM
+} from '@/lib/api'
 
 interface ConversionOptionsProps {
   config: ConversionConfig
@@ -30,6 +39,21 @@ const CONVERTERS: { value: ConverterType; label: string; desc: string }[] = [
 export function ConversionOptions({ config, onChange, disabled }: ConversionOptionsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [tempConfig, setTempConfig] = useState<ConversionConfig>(config)
+  const [providers, setProviders] = useState<LLMProvider[]>([])
+  const [activeLLM, setActiveLLM] = useState<ActiveLLM | null>(null)
+
+  useEffect(() => {
+    if (isModalOpen) {
+      Promise.all([getLLMProviders(), getActiveLLM()])
+        .then(([provs, active]) => {
+          setProviders(provs)
+          setActiveLLM(active)
+        })
+        .catch((err) => {
+          console.error('Failed to load LLM settings', err)
+        })
+    }
+  }, [isModalOpen])
 
   const update = <K extends keyof ConversionConfig>(key: K, value: ConversionConfig[K]) => {
     onChange({ ...config, [key]: value })
@@ -159,17 +183,59 @@ export function ConversionOptions({ config, onChange, disabled }: ConversionOpti
               />
 
               {tempConfig.use_llm && (
-                <div className="pl-4 border-l border-primary/20 space-y-2 animate-fade-in">
-                  <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase block">
-                    LLM Model Override
-                  </label>
-                  <Input
-                    value={tempConfig.llm_model ?? ''}
-                    onChange={(e) => updateTemp('llm_model', e.target.value)}
-                    placeholder="Leave blank for default (e.g. gemini-2.0-flash)"
-                    disabled={disabled}
-                    className="bg-background/50 h-9 text-xs"
-                  />
+                <div className="pl-4 border-l border-primary/20 space-y-3 animate-fade-in relative z-20">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase block">
+                      LLM Provider Override
+                    </label>
+                    <Select
+                      value={tempConfig.llm_provider ?? ''}
+                      onChange={(val) => {
+                        updateTemp('llm_provider', val || undefined)
+                        const prov = providers.find((p) => p.id === val)
+                        const firstModel = prov?.models?.[0]?.model_id || ''
+                        updateTemp('llm_model', firstModel || undefined)
+                      }}
+                      disabled={disabled}
+                      options={[
+                        {
+                          value: '',
+                          label: activeLLM && activeLLM.provider_id !== 'none'
+                            ? `Use Global Active (${providers.find(p => p.id === activeLLM.provider_id)?.label || activeLLM.provider_id}: ${activeLLM.model_id})`
+                            : 'Use Global Active (No Override)'
+                        },
+                        ...providers.map((p) => ({
+                          value: p.id,
+                          label: p.label
+                        }))
+                      ]}
+                      className="w-full md:w-full"
+                    />
+                  </div>
+
+                  {tempConfig.llm_provider && (
+                    <div className="space-y-1.5 animate-fade-in">
+                      <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase block">
+                        LLM Model Override
+                      </label>
+                      <Select
+                        value={tempConfig.llm_model ?? ''}
+                        onChange={(val) => updateTemp('llm_model', val || undefined)}
+                        disabled={disabled}
+                        options={(() => {
+                          const selectedProv = providers.find((p) => p.id === tempConfig.llm_provider)
+                          if (!selectedProv || !selectedProv.models || selectedProv.models.length === 0) {
+                            return [{ value: '', label: 'No models configured for this provider' }]
+                          }
+                          return selectedProv.models.map((m) => ({
+                            value: m.model_id,
+                            label: m.model_id
+                          }))
+                        })()}
+                        className="w-full md:w-full"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -51,77 +51,92 @@ def build_marker_options(
 ) -> dict[str, Any]:
     """Build the options dict that ConfigParser expects.
 
-    This dict uses marker's CLI-style key names. ConfigParser will
-    convert them into the proper nested config structure.
+    Resolves selected/overridden LLM provider and model configurations.
     """
     options: dict[str, Any] = {}
 
-    service = llm_config.get("llm_service", "no_llm")
-    if service and service != "no_llm":
+    use_llm = conversion_config.get("use_llm", False)
+    if use_llm:
+        providers = llm_config.get("providers", [])
+        active = llm_config.get("active", {})
+
+        provider_id = conversion_config.get("llm_provider") or active.get("provider_id", "none")
+        model_id = conversion_config.get("llm_model") or active.get("model_id", "")
+
+        if provider_id == "none" or not provider_id:
+            options.update({k: v for k, v in conversion_config.items() if k not in ("llm_provider", "llm_model")})
+            return options
+
+        prov = next((p for p in providers if p["id"] == provider_id), None)
+        if not prov:
+            options.update({k: v for k, v in conversion_config.items() if k not in ("llm_provider", "llm_model")})
+            return options
+
         options["use_llm"] = True
+        p_type = prov["type"]
 
-        if llm_config.get("timeout"):
-            options["timeout"] = llm_config["timeout"]
-        if llm_config.get("max_retries"):
-            options["max_retries"] = llm_config["max_retries"]
-        if llm_config.get("retry_wait_time"):
-            options["retry_wait_time"] = llm_config["retry_wait_time"]
-        if llm_config.get("max_output_tokens"):
-            options["max_output_tokens"] = llm_config["max_output_tokens"]
+        model_cfg = next((m for m in prov.get("models", []) if m["model_id"] == model_id), None)
 
-        override_model = conversion_config.get("llm_model")
+        def_timeout = 60
+        def_retries = 3
+        def_output = 4096
 
-        if service == "gemini":
-            if llm_config.get("gemini_api_key"):
-                options["gemini_api_key"] = llm_config["gemini_api_key"]
-            model = override_model or llm_config.get("gemini_model_name")
-            if model:
-                options["gemini_model_name"] = model
+        if p_type in ("gemini", "claude"):
+            def_output = 8192
+            def_timeout = 30
+        elif p_type == "ollama":
+            def_timeout = 120
+        elif p_type == "openai" and model_id and "mini" in model_id:
+            def_output = 4096
 
-        elif service == "openai":
-            if llm_config.get("openai_api_key"):
-                options["openai_api_key"] = llm_config["openai_api_key"]
-            if llm_config.get("openai_base_url"):
-                options["openai_base_url"] = llm_config["openai_base_url"]
-            model = override_model or llm_config.get("openai_model")
-            if model:
-                options["openai_model"] = model
+        timeout = (model_cfg.get("timeout") if model_cfg else None) or def_timeout
+        max_retries = (model_cfg.get("max_retries") if model_cfg else None) or def_retries
+        max_output = (model_cfg.get("max_output_tokens") if model_cfg else None) or def_output
 
-        elif service == "claude":
-            if llm_config.get("claude_api_key"):
-                options["claude_api_key"] = llm_config["claude_api_key"]
-            model = override_model or llm_config.get("claude_model_name")
-            if model:
-                options["claude_model_name"] = model
+        options["timeout"] = timeout
+        options["max_retries"] = max_retries
+        options["retry_wait_time"] = 3
+        options["max_output_tokens"] = max_output
 
-        elif service == "ollama":
-            if llm_config.get("ollama_base_url"):
-                options["ollama_base_url"] = llm_config["ollama_base_url"]
-            model = override_model or llm_config.get("ollama_model")
-            if model:
-                options["ollama_model"] = model
+        secret_placeholder = f"secret:provider_{provider_id}_key_0_api_key"
 
-        elif service == "azure":
-            if llm_config.get("azure_endpoint"):
-                options["azure_endpoint"] = llm_config["azure_endpoint"]
-            if llm_config.get("azure_api_key"):
-                options["azure_api_key"] = llm_config["azure_api_key"]
-            if llm_config.get("azure_api_version"):
-                options["azure_api_version"] = llm_config["azure_api_version"]
-            model = override_model or llm_config.get("azure_deployment_name")
-            if model:
-                options["deployment_name"] = model
+        if p_type == "gemini":
+            options["llm_service"] = "gemini"
+            options["gemini_api_key"] = secret_placeholder
+            options["gemini_model_name"] = model_id
+        elif p_type == "claude":
+            options["llm_service"] = "claude"
+            options["claude_api_key"] = secret_placeholder
+            options["claude_model_name"] = model_id
+        elif p_type == "custom_anthropic":
+            import os
+            # Set environment variable for anthropic SDK
+            os.environ["ANTHROPIC_BASE_URL"] = prov.get("base_url") or "https://api.anthropic.com/v1"
+            options["llm_service"] = "claude"
+            options["claude_api_key"] = secret_placeholder
+            options["claude_model_name"] = model_id
+        elif p_type in ("openai", "custom_openai"):
+            options["llm_service"] = "openai"
+            options["openai_api_key"] = secret_placeholder
+            options["openai_base_url"] = prov.get("base_url") or "https://api.openai.com/v1"
+            options["openai_model"] = model_id
+        elif p_type == "ollama":
+            options["llm_service"] = "ollama"
+            options["ollama_base_url"] = prov.get("base_url") or "http://localhost:11434"
+            options["ollama_model"] = model_id
+        elif p_type == "azure":
+            options["llm_service"] = "azure"
+            options["azure_api_key"] = secret_placeholder
+            options["azure_endpoint"] = prov.get("base_url") or ""
+            options["azure_api_version"] = "2023-05-15"
+            options["deployment_name"] = model_id
+        elif p_type == "vertex":
+            options["llm_service"] = "vertex"
+            options["vertex_project_id"] = secret_placeholder
+            options["vertex_location"] = prov.get("base_url") or "us-central1"
+            options["gemini_model_name"] = model_id
 
-        elif service == "vertex":
-            if llm_config.get("vertex_project_id"):
-                options["vertex_project_id"] = llm_config["vertex_project_id"]
-            if llm_config.get("vertex_location"):
-                options["vertex_location"] = llm_config["vertex_location"]
-            model = override_model or llm_config.get("gemini_model_name")
-            if model:
-                options["gemini_model_name"] = model
-
-    options.update(conversion_config)
+    options.update({k: v for k, v in conversion_config.items() if k not in ("llm_provider", "llm_model")})
     return options
 
 

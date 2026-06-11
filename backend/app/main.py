@@ -88,6 +88,10 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
 
     # Load secrets cache and register live API interceptor monkeypatch
     from app.core.api_manager import load_secrets_from_db, setup_api_manager_monkeypatch
+    from app.routes.settings import init_llm_providers_if_missing
+    from app.database import async_session_factory
+    async with async_session_factory() as session:
+        await init_llm_providers_if_missing(session)
     await load_secrets_from_db()
     setup_api_manager_monkeypatch()
 

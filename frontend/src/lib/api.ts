@@ -13,6 +13,7 @@ export interface ConversionConfig {
   output_format: OutputFormat
   converter: ConverterType
   use_llm?: boolean
+  llm_provider?: string
   llm_model?: string
   force_ocr?: boolean
   paginate?: boolean
@@ -72,6 +73,29 @@ export interface LLMConfig {
   timeout: number
   max_retries: number
   max_output_tokens: number
+}
+
+export interface ModelConfig {
+  model_id: string
+  context_window?: number
+  max_retries?: number
+  max_output_tokens?: number
+  timeout?: number
+}
+
+export interface LLMProvider {
+  id: string
+  type: string
+  label: string
+  api_key?: string
+  fallback_api_keys: string[]
+  base_url?: string
+  models: ModelConfig[]
+}
+
+export interface ActiveLLM {
+  provider_id: string
+  model_id: string
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -202,6 +226,7 @@ export async function uploadFile(
   params.append('output_format', config.output_format)
   if (config.converter) params.append('converter', config.converter)
   if (config.use_llm !== undefined) params.append('use_llm', String(config.use_llm))
+  if (config.llm_provider) params.append('llm_provider', config.llm_provider)
   if (config.llm_model) params.append('llm_model', config.llm_model)
   if (config.force_ocr !== undefined) params.append('force_ocr', String(config.force_ocr))
   if (config.paginate !== undefined) params.append('paginate_output', String(config.paginate))
@@ -293,6 +318,40 @@ export async function testLLMConnection(config: LLMConfig): Promise<{ success: b
   return request<{ success: boolean; message: string }>('/settings/llm/test', {
     method: 'POST',
     body: JSON.stringify(backendConfig),
+  })
+}
+
+export async function getLLMProviders(): Promise<LLMProvider[]> {
+  return request<LLMProvider[]>('/settings/llm/providers')
+}
+
+export async function saveLLMProviders(providers: LLMProvider[]): Promise<LLMProvider[]> {
+  return request<LLMProvider[]>('/settings/llm/providers', {
+    method: 'PUT',
+    body: JSON.stringify(providers),
+  })
+}
+
+export async function getActiveLLM(): Promise<ActiveLLM> {
+  return request<ActiveLLM>('/settings/llm/active')
+}
+
+export async function setActiveLLM(active: ActiveLLM): Promise<ActiveLLM> {
+  return request<ActiveLLM>('/settings/llm/active', {
+    method: 'PUT',
+    body: JSON.stringify(active),
+  })
+}
+
+export async function fetchAvailableModels(
+  providerId: string | undefined,
+  type: string,
+  baseUrl?: string,
+  apiKey?: string
+): Promise<string[]> {
+  return request<string[]>('/settings/llm/providers/fetch-models', {
+    method: 'POST',
+    body: JSON.stringify({ provider_id: providerId, type, base_url: baseUrl, api_key: apiKey }),
   })
 }
 

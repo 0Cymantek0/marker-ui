@@ -48,11 +48,11 @@ const PIPELINE_ORDER: PipelineItem[] = [
 export function PipelineVisualizer({ models }: PipelineVisualizerProps) {
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5 pb-2 border-b border-slate-800/60">
-        <h3 className="text-xs uppercase tracking-widest font-extrabold text-slate-500">
+      <div className="space-y-1.5 pb-2 border-b border-border/40">
+        <h3 className="text-[10px] uppercase tracking-widest font-extrabold text-muted-foreground/60">
           Marker Processing Pipeline
         </h3>
-        <p className="text-xs text-slate-400">
+        <p className="text-[10px] text-muted-foreground/40 font-medium">
           The sequential neural network components responsible for document conversion.
         </p>
       </div>

@@ -256,7 +256,7 @@ export function FileUpload({
             value={localPaths}
             onChange={(e) => onLocalPathsChange(e.target.value)}
             placeholder="e.g. C:\path\to\document.pdf&#10;e.g. C:\path\to\report.docx"
-            className="w-full h-[120px] bg-background/50 border border-border/80 rounded-xl p-3 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/50 transition-all font-mono leading-relaxed"
+            className="w-full h-[120px] bg-background/50 border border-border/80 rounded-xl p-3 text-xs placeholder:text-muted-foreground/50 focus:outline-none transition-all font-mono leading-relaxed"
           />
           <p className="text-[10px] text-muted-foreground/80 leading-normal">
             * Backend reads files directly from your computer. Outputs will save to the same folder as the input file unless a custom folder is specified below.
@@ -278,7 +278,7 @@ export function FileUpload({
             value={outputDir}
             onChange={(e) => onOutputDirChange(e.target.value)}
             placeholder="e.g. C:\path\to\output_folder"
-            className="bg-background/50 h-9 text-xs flex-1 rounded-xl"
+            className="bg-background/50 text-xs flex-1 rounded-xl"
           />
           <button
             type="button"
