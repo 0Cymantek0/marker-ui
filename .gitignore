@@ -53,7 +53,10 @@ logs/
 .omo/
 .opencode/
 .commandcode/
+graphify-out/
 
+# TypeScript Build Cache
+*.tsbuildinfo
 
 # Alembic cache
 backend/alembic/versions/__pycache__/

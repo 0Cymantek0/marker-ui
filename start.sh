@@ -24,6 +24,24 @@ ok()    { echo -e "  ${GREEN}$1${NC}"; }
 warn()  { echo -e "  ${YELLOW}$1${NC}"; }
 err()   { echo -e "  ${RED}$1${NC}"; }
 
+# ── Clean up orphaned processes ──────────────────────────────────────
+echo -e "  Checking and cleaning up any orphaned processes on ports 8000 and 5173..."
+for port in 8000 5173; do
+    if command -v lsof &>/dev/null; then
+        pid=$(lsof -t -i:$port 2>/dev/null || true)
+        if [ -n "$pid" ]; then
+            warn "    Killing process $pid on port $port..."
+            kill -9 $pid 2>/dev/null || true
+        fi
+    elif command -v fuser &>/dev/null; then
+        pid=$(fuser $port/tcp 2>/dev/null || true)
+        if [ -n "$pid" ]; then
+            warn "    Killing process $pid on port $port..."
+            kill -9 $pid 2>/dev/null || true
+        fi
+    fi
+done
+
 # ── Prerequisites ────────────────────────────────────────────────────
 echo -e "${YELLOW}[1/6] Checking prerequisites...${NC}"
 

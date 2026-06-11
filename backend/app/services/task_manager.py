@@ -141,8 +141,9 @@ class TaskManager:
 
         while True:
             if await request.is_disconnected():
-                self._tasks.pop(job_id, None)
-                self._progress.pop(job_id, None)
+                # Release the SSE connection handler, but DO NOT pop/cancel the background task!
+                # This allows the background conversion task to continue executing and allows
+                # the client to reconnect or query status later.
                 return
 
             info = self.get_status(job_id)
@@ -188,20 +189,17 @@ class TaskManager:
             result = marker_service.convert_file(filepath, dict(config))
             self._progress[job_id] = 90
 
-            output_text = result.get("text", "")
-            output_format = config.get("output_format", "markdown")
-
             # Persist result synchronously via a new async loop
             try:
                 asyncio.run(
-                    self._finalize_job(job_id, output_text, output_format)
+                    self._finalize_job(job_id, result, config)
                 )
             except RuntimeError:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
                     loop.run_until_complete(
-                        self._finalize_job(job_id, output_text, output_format)
+                        self._finalize_job(job_id, result, config)
                     )
                 finally:
                     loop.close()
@@ -243,17 +241,70 @@ class TaskManager:
     async def _finalize_job(
         self,
         job_id: str,
-        result_text: str,
-        output_format: str,
+        result: dict[str, Any],
+        config: dict[str, Any],
     ) -> None:
+        result_text = result.get("text", "")
+        images = result.get("images", {})
+        output_format = config.get("output_format", "markdown")
+        original_name = config.get("original_name", "output")
+        local_filepath = config.get("local_filepath")
+        output_dir = config.get("output_dir")
+
         ext_map = {"markdown": "md", "json": "json", "html": "html", "chunks": "json"}
         extension = ext_map.get(output_format, "md")
-        output_dir = Path("data/output")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{job_id}.{extension}"
 
-        async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
-            await f.write(result_text)
+        # Determine target base directory
+        if output_dir:
+            target_dir = Path(output_dir)
+        elif local_filepath:
+            target_dir = Path(local_filepath).parent
+        else:
+            target_dir = Path("data/output")
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # We save as a directory if images are extracted
+        has_images = bool(images) and not config.get("disable_image_extraction", False)
+
+        if has_images:
+            if output_dir or local_filepath:
+                stem = Path(original_name).stem
+                job_output_dir = target_dir / stem
+            else:
+                job_output_dir = target_dir / job_id
+
+            job_output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save the main document
+            doc_name = f"{Path(original_name).stem}.{extension}"
+            doc_path = job_output_dir / doc_name
+            async with aiofiles.open(doc_path, "w", encoding="utf-8") as f:
+                await f.write(result_text)
+
+            # Save extracted images
+            for img_name, img in images.items():
+                img_path = job_output_dir / img_name
+                try:
+                    if hasattr(img, "save"):
+                        img.save(img_path)
+                    else:
+                        img_path.write_bytes(img)
+                except Exception as e:
+                    logger.error("Failed to save image %s: %s", img_name, e)
+
+            final_path = job_output_dir
+        else:
+            if output_dir or local_filepath:
+                stem = Path(original_name).stem
+                doc_path = target_dir / f"{stem}.{extension}"
+            else:
+                doc_path = target_dir / f"{job_id}.{extension}"
+
+            async with aiofiles.open(doc_path, "w", encoding="utf-8") as f:
+                await f.write(result_text)
+
+            final_path = doc_path
 
         async with async_session_factory() as session:
             from sqlalchemy import update
@@ -264,7 +315,7 @@ class TaskManager:
                 .values(
                     status="completed",
                     result_text=result_text,
-                    result_path=str(output_path),
+                    result_path=str(final_path),
                     progress=100,
                     completed_at=datetime.now(timezone.utc),
                 )

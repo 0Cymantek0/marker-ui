@@ -99,11 +99,22 @@ echo.
 
 :: Find a free port for the backend (starting from 8000)
 set BACKEND_PORT=8000
+
+echo   Checking and cleaning up any orphaned processes on port 8000 and 5173...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":8000 .*LISTENING"') do (
+    echo     Killing orphaned backend process %%a...
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":5173 .*LISTENING"') do (
+    echo     Killing orphaned frontend process %%a...
+    taskkill /F /PID %%a >nul 2>&1
+)
+
 :findPort
-    netstat -aon | findstr ":%BACKEND_PORT% .*LISTENING" >nul 2>&1
-    if %ERRORLEVEL% equ 0 (
+    netstat -aon | findstr /R /C:":!BACKEND_PORT! .*LISTENING" >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
         set /a BACKEND_PORT+=1
-        if %BACKEND_PORT% geq 65535 (
+        if !BACKEND_PORT! geq 65535 (
             echo   ERROR: No free port found for backend.
             pause
             exit /b 1
@@ -111,37 +122,37 @@ set BACKEND_PORT=8000
         goto findPort
     )
 
-if not "%BACKEND_PORT%"=="8000" (
-    echo   Port 8000 is in use, using port %BACKEND_PORT% instead.
+if not "!BACKEND_PORT!"=="8000" (
+    echo   Port 8000 is in use, using port !BACKEND_PORT! instead.
 )
 
-echo   Starting backend on http://localhost:%BACKEND_PORT% ...
-start /B .venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --app-dir backend
+echo   Starting backend on http://localhost:!BACKEND_PORT! ...
+start /B .venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port !BACKEND_PORT! --app-dir backend
 
-:: Wait for backend to start (checks up to 15 times with 1-second delay)
+:: Wait for backend to start (checks up to 30 times with 1-second delay)
 echo   Waiting for backend to start...
 set WAIT_COUNT=0
 :checkBackendLoop
-netstat -aon | findstr ":%BACKEND_PORT% .*LISTENING" >nul 2>&1
-if %ERRORLEVEL% equ 0 goto backendStarted
+netstat -aon | findstr /R /C:":!BACKEND_PORT! .*LISTENING" >nul 2>&1
+if !ERRORLEVEL! equ 0 goto backendStarted
 set /a WAIT_COUNT+=1
-if %WAIT_COUNT% geq 15 (
-    echo   ERROR: Backend failed to start on port %BACKEND_PORT% within 15 seconds.
+if !WAIT_COUNT! geq 30 (
+    echo   ERROR: Backend failed to start on port !BACKEND_PORT! within 30 seconds.
     pause
     exit /b 1
 )
-timeout /t 1 /nobreak >nul
+ping -n 2 127.0.0.1 >nul
 goto checkBackendLoop
 
 :backendStarted
-echo   Backend is listening on port %BACKEND_PORT%.
+echo   Backend is listening on port !BACKEND_PORT!.
 
 echo   Starting frontend on http://localhost:5173 ...
 cd frontend
-start "" /B cmd /c "set BACKEND_PORT=%BACKEND_PORT% && npm run dev"
+start "" /B cmd /c "set BACKEND_PORT=!BACKEND_PORT!&& npm run dev"
 cd ..
 
-timeout /t 3 /nobreak >nul
+ping -n 4 127.0.0.1 >nul
 
 echo.
 echo   ========================================

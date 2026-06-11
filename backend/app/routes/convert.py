@@ -68,7 +68,9 @@ async def _load_llm_config(db: AsyncSession) -> dict[str, Any]:
 
 @router.post("/upload", response_model=ConversionResponse)
 async def upload_file(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    local_filepath: Optional[str] = Query(None, description="Optional local absolute file path on the server"),
+    output_dir: Optional[str] = Query(None, description="Optional custom output directory path"),
     output_format: str = Query("markdown", description="Output format: markdown, json, html, chunks"),
     converter: Optional[str] = Query(None, description="Converter class: PdfConverter, TableConverter, OCRConverter"),
     use_llm: bool = Query(False, description="Enable LLM-assisted conversion"),
@@ -83,11 +85,41 @@ async def upload_file(
     debug: bool = Query(False, description="Enable debug output"),
     db: AsyncSession = Depends(get_db),
 ) -> ConversionResponse:
-    """Accept a document upload, create a job, and start conversion."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
+    """Accept a document upload or local file path, create a job, and start conversion."""
+    if not file and not local_filepath:
+        raise HTTPException(
+            status_code=400,
+            detail="Either an uploaded file or a local_filepath must be provided.",
+        )
 
-    suffix = Path(file.filename).suffix.lower()
+    original_name = ""
+    suffix = ""
+    stored_path = ""
+    is_local = False
+
+    if local_filepath:
+        path = Path(local_filepath)
+        if not path.is_absolute():
+            raise HTTPException(
+                status_code=400,
+                detail="The local_filepath must be an absolute path.",
+            )
+        if not path.is_file():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Local file not found: {local_filepath}",
+            )
+        original_name = path.name
+        suffix = path.suffix.lower()
+        stored_path = str(path)
+        is_local = True
+    else:
+        if not file or not file.filename:
+            raise HTTPException(status_code=400, detail="No file or filename provided")
+        original_name = file.filename
+        suffix = Path(file.filename).suffix.lower()
+        is_local = False
+
     # Validate file extension
     if suffix.lower() not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -98,32 +130,37 @@ async def upload_file(
 
     job_id = str(uuid.uuid4())
     stored_name = f"{job_id}{suffix}"
-    stored_path = UPLOAD_DIR / stored_name
 
-    # Stream upload to disk with size limit
-    limit_exceeded = False
-    try:
-        total_size = 0
-        async with aiofiles.open(stored_path, "wb") as f:
-            while chunk := await file.read(1024 * 1024):  # 1 MB chunks
-                total_size += len(chunk)
-                if total_size > MAX_UPLOAD_SIZE:
-                    limit_exceeded = True
-                    break
-                await f.write(chunk)
-    except Exception as exc:
-        stored_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}") from exc
+    if not is_local and file:
+        stored_path_obj = UPLOAD_DIR / stored_name
+        stored_path = str(stored_path_obj)
+        # Stream upload to disk with size limit
+        limit_exceeded = False
+        try:
+            total_size = 0
+            async with aiofiles.open(stored_path_obj, "wb") as f:
+                while chunk := await file.read(1024 * 1024):  # 1 MB chunks
+                    total_size += len(chunk)
+                    if total_size > MAX_UPLOAD_SIZE:
+                        limit_exceeded = True
+                        break
+                    await f.write(chunk)
+        except Exception as exc:
+            stored_path_obj.unlink(missing_ok=True)
+            raise HTTPException(status_code=500, detail=f"Upload failed: {exc}") from exc
 
-    if limit_exceeded:
-        stored_path.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds maximum size (too large) of {MAX_UPLOAD_SIZE} bytes.",
-        )
+        if limit_exceeded:
+            stored_path_obj.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum size (too large) of {MAX_UPLOAD_SIZE} bytes.",
+            )
 
     # Build conversion config from query params
-    config: dict[str, Any] = {"output_format": output_format}
+    config: dict[str, Any] = {
+        "output_format": output_format,
+        "original_name": original_name,
+    }
     if converter:
         config["converter_cls"] = converter
     if use_llm:
@@ -146,12 +183,16 @@ async def upload_file(
         config["redo_inline_math"] = True
     if debug:
         config["debug"] = True
+    if local_filepath:
+        config["local_filepath"] = local_filepath
+    if output_dir:
+        config["output_dir"] = output_dir
 
     # DB record
     job = ConversionJob(
         id=job_id,
-        filename=stored_name,
-        original_name=file.filename,
+        filename=stored_name if not is_local else original_name,
+        original_name=original_name,
         status="pending",
         input_format=input_format,
         output_format=output_format,
@@ -170,12 +211,12 @@ async def upload_file(
     from app.services.marker_service import build_marker_options
     options = build_marker_options(llm_config, config)
 
-    task_manager.submit_job(job_id, str(stored_path), options, marker_service)
+    task_manager.submit_job(job_id, stored_path, options, marker_service)
 
     return ConversionResponse(
         job_id=job_id,
         status="pending",
-        filename=file.filename,
+        filename=original_name,
         output_format=output_format,
     )
 
@@ -198,11 +239,17 @@ async def get_status(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Merge in-memory progress from task manager if still processing
-    from app.main import _app_state
+    status = job.status
+    progress = job.progress
 
-    live = _app_state.task_manager.get_status(job_id)
-    progress = live.get("progress", job.progress)
+    # Merge in-memory progress from task manager if still processing
+    if job.status not in ("completed", "failed", "cancelled"):
+        from app.main import _app_state
+
+        live = _app_state.task_manager.get_status(job_id)
+        if live.get("status") in ("processing", "completed", "failed", "cancelled"):
+            status = live["status"]
+            progress = max(progress, live.get("progress", 0))
 
     # Parse config to extract converter
     converter = "PdfConverter"
@@ -216,7 +263,7 @@ async def get_status(
 
     return JobStatusResponse(
         job_id=job.id,
-        status=live.get("status", job.status),
+        status=status,
         progress=progress,
         error_message=job.error_message,
         result_text=job.result_text,
@@ -385,7 +432,11 @@ async def delete_job(
     if job.result_path:
         result_path = Path(job.result_path)
         if result_path.exists():
-            result_path.unlink()
+            if result_path.is_dir():
+                import shutil
+                shutil.rmtree(result_path)
+            else:
+                result_path.unlink()
 
     await db.delete(job)
 

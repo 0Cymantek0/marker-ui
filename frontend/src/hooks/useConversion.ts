@@ -330,8 +330,12 @@ export function useConversion() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
+    
+    // Inspect if the downloaded package is a ZIP bundle to avoid wrong extension naming
+    const isZip = blob.type === 'application/zip'
     const extMap: Record<string, string> = { markdown: 'md', json: 'json', html: 'html', chunks: 'json' }
-    const ext = extMap[state.outputFormat] || 'md'
+    const ext = isZip ? 'zip' : (extMap[state.outputFormat] || 'md')
+    
     a.download = `marker-output-${state.jobId}.${ext}`
     document.body.appendChild(a)
     a.click()

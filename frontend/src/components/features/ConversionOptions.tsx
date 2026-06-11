@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { FileText, Code, Braces, Layers, HelpCircle, Settings2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -125,7 +126,7 @@ export function ConversionOptions({ config, onChange, disabled }: ConversionOpti
       </div>
 
       {/* Popup Dialog Modal */}
-      {isModalOpen && (
+      {isModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="glass-card max-w-lg w-full bg-background border border-border/50 rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] text-left">
             
@@ -266,7 +267,8 @@ export function ConversionOptions({ config, onChange, disabled }: ConversionOpti
             </div>
             
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

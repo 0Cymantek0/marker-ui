@@ -41,6 +41,21 @@ function Get-PythonCmd {
     return $null
 }
 
+# ── Clean up orphaned processes ──────────────────────────────────────
+Write-Host "  Checking and cleaning up any orphaned processes on ports 8000 and 5173..." -ForegroundColor DarkGray
+foreach ($port in @(8000, 5173)) {
+    $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+    if ($connections) {
+        foreach ($conn in $connections) {
+            $pid = $conn.OwningProcess
+            if ($pid) {
+                Write-Host "    Killing process $pid on port $port..." -ForegroundColor DarkYellow
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
 # ── Check prerequisites ──────────────────────────────────────────────
 
 Write-Host "[1/6] Checking prerequisites..." -ForegroundColor Yellow
@@ -192,7 +207,7 @@ if ($backendJob.HasExited) {
 # Frontend — use cmd.exe because npm is a .cmd file on Windows, not a real .exe
 Write-Host "  Starting frontend on http://localhost:5173 ..." -ForegroundColor Cyan
 if ($IsWindows -or $env:OS -match "Windows") {
-    $frontendJob = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "set BACKEND_PORT=$backendPort && npm run dev" -WorkingDirectory "$PWD\frontend" -PassThru -WindowStyle Hidden
+    $frontendJob = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "set BACKEND_PORT=$backendPort&& npm run dev" -WorkingDirectory "$PWD\frontend" -PassThru -WindowStyle Hidden
 } else {
     $frontendJob = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "$PWD/frontend" -PassThru -WindowStyle Hidden
 }

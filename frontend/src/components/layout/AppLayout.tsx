@@ -3,13 +3,16 @@ import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { Sidebar } from './Sidebar'
 import { ThemeProvider, useTheme } from './ThemeContext'
+import { ConversionProvider } from '@/hooks/useConversionQueue'
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <ThemeProvider>
-      <AppContent collapsed={collapsed} setCollapsed={setCollapsed} />
+      <ConversionProvider>
+        <AppContent collapsed={collapsed} setCollapsed={setCollapsed} />
+      </ConversionProvider>
     </ThemeProvider>
   )
 }

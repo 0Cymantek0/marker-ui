@@ -152,8 +152,9 @@ class TestSSEEvents:
             events.append(event)
 
         assert call_count >= 2
-        assert "disconnect-job" not in task_manager._tasks
-        assert "disconnect-job" not in task_manager._progress
+        # Client disconnect should NOT remove the job or progress from task manager.
+        assert "disconnect-job" in task_manager._tasks
+        assert "disconnect-job" in task_manager._progress
 
     @pytest.mark.asyncio
     async def test_sse_stops_on_failed(self, task_manager: TaskManager):

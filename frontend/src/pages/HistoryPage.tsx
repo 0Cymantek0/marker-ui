@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { getHistory, deleteJob, downloadResult, type JobStatus } from '@/lib/api'
+import { getHistory, deleteJob, downloadResult, getJobStatus, type JobStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 const STATUS_VARIANT = {
@@ -56,6 +56,7 @@ export function HistoryPage() {
   
   // Expanded job tracking
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null)
+  const [loadingPreviews, setLoadingPreviews] = useState<Record<string, boolean>>({})
 
   const fetchJobs = useCallback(async () => {
     setIsLoading(true)
@@ -134,8 +135,27 @@ export function HistoryPage() {
     }
   }, [jobs, total])
 
-  const toggleExpand = (jobId: string) => {
-    setExpandedJobId(expandedJobId === jobId ? null : jobId)
+  const toggleExpand = async (jobId: string) => {
+    const nextId = expandedJobId === jobId ? null : jobId
+    setExpandedJobId(nextId)
+
+    if (nextId) {
+      const targetJob = jobs.find((j) => j.id === jobId)
+      // If the job is completed but doesn't have the result text loaded yet, fetch it dynamically
+      if (targetJob && targetJob.status === 'completed' && !targetJob.result_text) {
+        setLoadingPreviews((prev) => ({ ...prev, [jobId]: true }))
+        try {
+          const detailed = await getJobStatus(jobId)
+          setJobs((prev) =>
+            prev.map((j) => (j.id === jobId ? { ...j, result_text: detailed.result_text } : j))
+          )
+        } catch (err) {
+          console.error('Failed to load job result text:', err)
+        } finally {
+          setLoadingPreviews((prev) => ({ ...prev, [jobId]: false }))
+        }
+      }
+    }
   }
 
   const totalPages = Math.ceil(total / 20)
@@ -370,7 +390,12 @@ export function HistoryPage() {
                           <div className="space-y-1.5">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Document Output Preview</span>
                             <div className="border border-border/40 rounded-xl overflow-hidden shadow-sm bg-slate-950/5/10 max-h-[220px] overflow-y-auto">
-                              {job.result_text ? (
+                              {loadingPreviews[job.id] ? (
+                                <div className="p-6 text-center text-xs text-muted-foreground italic bg-background/40 flex items-center justify-center gap-2">
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
+                                  Loading document preview...
+                                </div>
+                              ) : job.result_text ? (
                                 <pre className="p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap select-text text-slate-800 dark:text-slate-300">
                                   {job.result_text}
                                 </pre>

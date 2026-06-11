@@ -188,11 +188,15 @@ async function request<T>(
 // ─── API Functions ───────────────────────────────────────────────────
 
 export async function uploadFile(
-  file: File,
-  config: ConversionConfig
+  file: File | null,
+  config: ConversionConfig,
+  localFilepath?: string,
+  outputDir?: string
 ): Promise<ConversionResponse> {
   const form = new FormData()
-  form.append('file', file)
+  if (file) {
+    form.append('file', file)
+  }
 
   const params = new URLSearchParams()
   params.append('output_format', config.output_format)
@@ -205,10 +209,12 @@ export async function uploadFile(
   if (config.language) params.append('lang', config.language)
   if (config.disable_multiprocessing !== undefined) params.append('disable_multiprocessing', String(config.disable_multiprocessing))
   if (config.debug !== undefined) params.append('debug', String(config.debug))
+  if (localFilepath) params.append('local_filepath', localFilepath)
+  if (outputDir) params.append('output_dir', outputDir)
 
   const res = await fetch(`${API_BASE}/convert/upload?${params.toString()}`, {
     method: 'POST',
-    body: form,
+    body: file ? form : undefined,
   })
 
   if (!res.ok) {
