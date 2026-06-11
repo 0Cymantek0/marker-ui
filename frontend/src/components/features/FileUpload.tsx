@@ -215,7 +215,7 @@ export function FileUpload({
             disabled={disabled}
             value={localPaths}
             onChange={(e) => onLocalPathsChange(e.target.value)}
-            placeholder="e.g. C:\Users\shuvagata\Downloads\openskill.pdf&#10;e.g. C:\Users\shuvagata\Documents\report.docx"
+            placeholder="e.g. C:\path\to\document.pdf&#10;e.g. C:\path\to\report.docx"
             className="w-full h-[120px] bg-background/50 border border-border/80 rounded-xl p-3 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/50 transition-all font-mono leading-relaxed"
           />
           <p className="text-[10px] text-muted-foreground/80 leading-normal">
@@ -236,7 +236,7 @@ export function FileUpload({
           disabled={disabled}
           value={outputDir}
           onChange={(e) => onOutputDirChange(e.target.value)}
-          placeholder="e.g. C:\Users\shuvagata\Desktop\Output"
+          placeholder="e.g. C:\path\to\output_folder"
           className="bg-background/50 h-9 text-xs"
         />
         <p className="text-[9px] text-muted-foreground/75 leading-normal">

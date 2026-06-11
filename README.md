@@ -94,7 +94,7 @@ The application can be customized using the following environment variables (def
 
 ## Development & Architecture
 
-For details on the project folder structure, API endpoints, running tests, or managing database migrations, please refer to [DEVELOPMENT.md](file:///c:/Users/shuvagata/Documents/dev/marker/DEVELOPMENT.md).
+For details on the project folder structure, API endpoints, running tests, or managing database migrations, please refer to [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 
