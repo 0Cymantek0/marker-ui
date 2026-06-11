@@ -202,6 +202,7 @@ export async function uploadFile(
   params.append('output_format', config.output_format)
   if (config.converter) params.append('converter', config.converter)
   if (config.use_llm !== undefined) params.append('use_llm', String(config.use_llm))
+  if (config.llm_model) params.append('llm_model', config.llm_model)
   if (config.force_ocr !== undefined) params.append('force_ocr', String(config.force_ocr))
   if (config.paginate !== undefined) params.append('paginate_output', String(config.paginate))
   if (config.disable_image_extraction !== undefined) params.append('disable_image_extraction', String(config.disable_image_extraction))

@@ -151,9 +151,11 @@ async def upsert_setting(
 
     save_value = body.value
     # If the value is masked (user didn't change it), keep existing encrypted value
-    if is_sensitive_key(body.key) and is_masked(body.value) and row:
+    if is_encrypted_field(body.key) and is_masked(body.value) and row:
         save_value = row.value  # preserve existing encrypted value
-    elif is_sensitive_key(body.key) and body.value:
+    elif is_encrypted_field(body.key) and body.value:
+        from app.core.api_manager import update_secret_cache
+        update_secret_cache(body.key, body.value)
         save_value = encrypt_value(body.value)
 
     if row:
@@ -185,9 +187,11 @@ async def batch_upsert(
         row = result.scalar_one_or_none()
 
         save_value = item.value
-        if is_sensitive_key(item.key) and is_masked(item.value) and row:
+        if is_encrypted_field(item.key) and is_masked(item.value) and row:
             save_value = row.value
-        elif is_sensitive_key(item.key) and item.value:
+        elif is_encrypted_field(item.key) and item.value:
+            from app.core.api_manager import update_secret_cache
+            update_secret_cache(item.key, item.value)
             save_value = encrypt_value(item.value)
 
         if row:
@@ -228,6 +232,7 @@ _LLM_SENSITIVE_KEYS = {
     "openai_api_key",
     "claude_api_key",
     "azure_api_key",
+    "vertex_project_id",
 }
 
 
@@ -289,6 +294,8 @@ async def save_llm_config(
             # No existing row but value is masked — nothing to save
             continue
         elif key in _LLM_SENSITIVE_KEYS and serialized:
+            from app.core.api_manager import update_secret_cache
+            update_secret_cache(key, serialized)
             serialized = encrypt_value(serialized)
 
         stmt = select(Setting).where(Setting.key == key)
@@ -335,6 +342,13 @@ async def test_llm_connection(
             if not api_key:
                 raise HTTPException(status_code=400, detail="Gemini API Key is required")
 
+            if is_masked(api_key):
+                api_key = "secret:gemini_api_key"
+            else:
+                from app.core.api_manager import update_secret_cache
+                update_secret_cache("gemini_api_key", api_key)
+                api_key = "secret:gemini_api_key"
+
             # Use header-based auth instead of query param to avoid key in logs/URL
             url = "https://generativelanguage.googleapis.com/v1beta/models"
             headers = {"x-goog-api-key": api_key}
@@ -351,6 +365,13 @@ async def test_llm_connection(
             api_key = body.openai_api_key
             if not api_key:
                 raise HTTPException(status_code=400, detail="OpenAI API Key is required")
+
+            if is_masked(api_key):
+                api_key = "secret:openai_api_key"
+            else:
+                from app.core.api_manager import update_secret_cache
+                update_secret_cache("openai_api_key", api_key)
+                api_key = "secret:openai_api_key"
 
             base_url = body.openai_base_url or "https://api.openai.com/v1"
             validate_llm_url(base_url)
@@ -371,6 +392,13 @@ async def test_llm_connection(
             api_key = body.claude_api_key
             if not api_key:
                 raise HTTPException(status_code=400, detail="Claude API Key is required")
+
+            if is_masked(api_key):
+                api_key = "secret:claude_api_key"
+            else:
+                from app.core.api_manager import update_secret_cache
+                update_secret_cache("claude_api_key", api_key)
+                api_key = "secret:claude_api_key"
 
             url = "https://api.anthropic.com/v1/messages"
             headers = {
@@ -414,6 +442,13 @@ async def test_llm_connection(
             if not api_key or not endpoint:
                 raise HTTPException(status_code=400, detail="Azure API Key and Endpoint are required")
 
+            if is_masked(api_key):
+                api_key = "secret:azure_api_key"
+            else:
+                from app.core.api_manager import update_secret_cache
+                update_secret_cache("azure_api_key", api_key)
+                api_key = "secret:azure_api_key"
+
             validate_llm_url(endpoint)
             endpoint = endpoint.rstrip("/")
             url = f"{endpoint}/openai/models?api-version=2023-05-15"
@@ -428,9 +463,18 @@ async def test_llm_connection(
             return {"success": True, "message": "Successfully connected to Azure OpenAI!"}
 
         elif service == "vertex":
-            if not body.vertex_project_id:
+            project_id = body.vertex_project_id
+            if not project_id:
                 raise HTTPException(status_code=400, detail="Vertex Project ID is required")
-            url = f"https://us-central1-aiplatform.googleapis.com/v1/projects/{body.vertex_project_id}/locations/us-central1/publishers/google/models"
+
+            if is_masked(project_id):
+                project_id = "secret:vertex_project_id"
+            else:
+                from app.core.api_manager import update_secret_cache
+                update_secret_cache("vertex_project_id", project_id)
+                project_id = "secret:vertex_project_id"
+
+            url = f"https://us-central1-aiplatform.googleapis.com/v1/projects/{project_id}/locations/us-central1/publishers/google/models"
             async with httpx.AsyncClient(timeout=timeout) as client:
                 res = await client.get(url)
             if res.status_code == 404:

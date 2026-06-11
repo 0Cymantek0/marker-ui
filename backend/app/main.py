@@ -86,6 +86,11 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     # Create DB tables
     await create_tables()
 
+    # Load secrets cache and register live API interceptor monkeypatch
+    from app.core.api_manager import load_secrets_from_db, setup_api_manager_monkeypatch
+    await load_secrets_from_db()
+    setup_api_manager_monkeypatch()
+
     # Mark stale pending/processing jobs from previous sessions as failed
     from app.database import async_session_factory
     from app.models.job import ConversionJob

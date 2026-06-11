@@ -344,3 +344,81 @@ class TestLLMConfigEndpoint:
 
         # The masked key should remain masked in response
         assert is_masked(resp.json()["gemini_api_key"])
+
+
+# ===========================================================================
+# LLM Connection Testing Interceptor Integration
+# ===========================================================================
+
+class TestLLMConnectionEndpoint:
+    @pytest.mark.asyncio
+    async def test_connection_with_masked_key(self, settings_client: AsyncClient, settings_session: AsyncSession):
+        # 1. Save key to database first so it is in settings table
+        # Clear existing
+        from sqlalchemy import delete
+        await settings_session.execute(delete(Setting).where(Setting.key == "gemini_api_key"))
+        settings_session.add(Setting(key="gemini_api_key", value=encrypt_value("real-gemini-super-secret-key"), category="llm"))
+        await settings_session.commit()
+
+        # Update cache in api_manager
+        from app.core.api_manager import update_secret_cache, setup_api_manager_monkeypatch
+        update_secret_cache("gemini_api_key", "real-gemini-super-secret-key")
+        setup_api_manager_monkeypatch()
+
+        # 2. Mock the underlying send method to verify placeholder replacement
+        import httpx
+        from app.core.api_manager import _orig_async_client_send
+
+        mock_response = httpx.Response(200, json={"models": []})
+        
+        async def mock_send(client_self, request, *args, **kwargs):
+            if "testserver" in str(request.url):
+                return await _orig_async_client_send(client_self, request, *args, **kwargs)
+            # Assert that the request headers contain the real decrypted key, NOT the placeholder or masked key
+            assert request.headers["x-goog-api-key"] == "real-gemini-super-secret-key"
+            return mock_response
+
+        with patch("app.core.api_manager._orig_async_client_send", new=mock_send):
+            from app.utils.secrets import mask_value
+            resp = await settings_client.post(
+                "/api/settings/llm/test",
+                json={
+                    "llm_service": "gemini",
+                    "gemini_api_key": mask_value("real-gemini-super-secret-key"),
+                }
+            )
+            assert resp.status_code == 200
+            assert resp.json()["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_connection_with_new_plaintext_key(self, settings_client: AsyncClient):
+        from app.core.api_manager import setup_api_manager_monkeypatch
+        setup_api_manager_monkeypatch()
+
+        import httpx
+        from app.core.api_manager import _orig_async_client_send
+
+        mock_response = httpx.Response(200, json={"models": []})
+        
+        async def mock_send(client_self, request, *args, **kwargs):
+            if "testserver" in str(request.url):
+                return await _orig_async_client_send(client_self, request, *args, **kwargs)
+            # Assert that the request headers contain the new plaintext key
+            assert request.headers["x-goog-api-key"] == "new-gemini-plaintext-key"
+            return mock_response
+
+        with patch("app.core.api_manager._orig_async_client_send", new=mock_send):
+            resp = await settings_client.post(
+                "/api/settings/llm/test",
+                json={
+                    "llm_service": "gemini",
+                    "gemini_api_key": "new-gemini-plaintext-key",
+                }
+            )
+            assert resp.status_code == 200
+            assert resp.json()["success"] is True
+            
+            # Verify that the cache was updated with the new plaintext key
+            from app.core.api_manager import get_secret
+            assert get_secret("gemini_api_key") == "new-gemini-plaintext-key"
+

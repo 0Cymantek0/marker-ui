@@ -279,6 +279,21 @@ export function ConvertPage() {
 
                       {/* Actions aligned directly inside the UI card to save space */}
                       <div className="flex items-center gap-1.5 relative z-10" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedJobId(job.id)
+                            setShowConsole(true)
+                          }}
+                          className={cn(
+                            "h-8 text-[10px] font-bold uppercase tracking-wider gap-1.5 rounded-lg text-muted-foreground hover:text-foreground",
+                            isSelected && "text-primary hover:text-primary"
+                          )}
+                        >
+                          <Terminal className="w-3.5 h-3.5" />
+                          Console
+                        </Button>
 
 
                         {isCompleted && (

@@ -38,10 +38,11 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def _load_llm_config(db: AsyncSession) -> dict[str, Any]:
     """Load stored LLM config from settings table.
 
-    Decrypts sensitive keys (API keys) so marker-pdf receives plaintext credentials.
+    Returns placeholder secret references (e.g. 'secret:key_name') for sensitive settings,
+    which are resolved in-flight by the api_manager interceptor.
     """
     from app.models.settings import Setting
-    from app.utils.secrets import decrypt_value, is_sensitive_key
+    from app.crypto import is_encrypted_field
     import json
 
     stmt = select(Setting).where(Setting.category == "llm")
@@ -54,9 +55,9 @@ async def _load_llm_config(db: AsyncSession) -> dict[str, Any]:
             parsed = json.loads(r.value)
         except (json.JSONDecodeError, TypeError):
             parsed = r.value
-        # Decrypt sensitive keys before passing to marker
-        if is_sensitive_key(r.key) and isinstance(parsed, str):
-            parsed = decrypt_value(parsed)
+        # Use placeholder for sensitive keys
+        if is_encrypted_field(r.key):
+            parsed = f"secret:{r.key}"
         data[r.key] = parsed
     return data
 
@@ -74,6 +75,7 @@ async def upload_file(
     output_format: str = Query("markdown", description="Output format: markdown, json, html, chunks"),
     converter: Optional[str] = Query(None, description="Converter class: PdfConverter, TableConverter, OCRConverter"),
     use_llm: bool = Query(False, description="Enable LLM-assisted conversion"),
+    llm_model: Optional[str] = Query(None, description="LLM model name override"),
     force_ocr: bool = Query(False, description="Force OCR on all pages"),
     paginate_output: bool = Query(False, description="Add page separators in output"),
     disable_image_extraction: bool = Query(False, description="Skip extracting images"),
@@ -165,6 +167,8 @@ async def upload_file(
         config["converter_cls"] = converter
     if use_llm:
         config["use_llm"] = True
+    if llm_model:
+        config["llm_model"] = llm_model
     if force_ocr:
         config["force_ocr"] = True
     if paginate_output:

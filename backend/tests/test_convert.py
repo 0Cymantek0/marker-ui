@@ -296,3 +296,81 @@ async def test_cancelled_job_stays_cancelled(
     assert fresh.status == "cancelled", (
         f"Expected 'cancelled' but got '{fresh.status}' — _fail_job overwrote it!"
     )
+
+
+# ---------------------------------------------------------------------------
+# LLM Model Override
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_upload_with_llm_model_override(client: AsyncClient, db_session):
+    """Verify upload endpoint accepts llm_model override and saves it in config."""
+    resp = await _upload_file(
+        client,
+        extra_params={"use_llm": "true", "llm_model": "custom-override-model-123"}
+    )
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+
+    from sqlalchemy import select
+    stmt = select(ConversionJob).where(ConversionJob.id == job_id)
+    res = await db_session.execute(stmt)
+    job = res.scalar_one()
+
+    cfg = json.loads(job.config_json)
+    assert cfg["llm_model"] == "custom-override-model-123"
+    assert cfg["use_llm"] is True
+
+
+def test_build_marker_options_model_override():
+    """Verify that build_marker_options correctly overrides model names for all services."""
+    from app.services.marker_service import build_marker_options
+
+    # Gemini
+    gemini_cfg = {"llm_service": "gemini", "gemini_model_name": "gemini-2.0-flash"}
+    opts = build_marker_options(gemini_cfg, {"llm_model": "gemini-1.5-pro"})
+    assert opts["gemini_model_name"] == "gemini-1.5-pro"
+
+    # Claude
+    claude_cfg = {"llm_service": "claude", "claude_model_name": "claude-3-7-sonnet"}
+    opts = build_marker_options(claude_cfg, {"llm_model": "claude-3-5-haiku"})
+    assert opts["claude_model_name"] == "claude-3-5-haiku"
+
+    # OpenAI
+    openai_cfg = {"llm_service": "openai", "openai_model": "gpt-4o-mini"}
+    opts = build_marker_options(openai_cfg, {"llm_model": "gpt-4o"})
+    assert opts["openai_model"] == "gpt-4o"
+
+
+@pytest.mark.asyncio
+async def test_upload_with_advanced_settings(client: AsyncClient, db_session):
+    """Verify upload endpoint accepts advanced settings (page_range, lang) and saves them."""
+    resp = await _upload_file(
+        client,
+        extra_params={"page_range": "1-3,5", "lang": "fr"}
+    )
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+
+    from sqlalchemy import select
+    stmt = select(ConversionJob).where(ConversionJob.id == job_id)
+    res = await db_session.execute(stmt)
+    job = res.scalar_one()
+
+    cfg = json.loads(job.config_json)
+    assert cfg["page_range"] == "1-3,5"
+    assert cfg["lang"] == "fr"
+
+
+def test_build_marker_options_advanced_settings():
+    """Verify that build_marker_options correctly includes page_range and lang."""
+    from app.services.marker_service import build_marker_options
+
+    llm_cfg = {"llm_service": "gemini", "gemini_model_name": "gemini-2.0-flash"}
+    conv_cfg = {"page_range": "1-5", "lang": "es"}
+    opts = build_marker_options(llm_cfg, conv_cfg)
+
+    assert opts["page_range"] == "1-5"
+    assert opts["lang"] == "es"
+
+

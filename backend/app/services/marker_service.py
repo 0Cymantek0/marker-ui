@@ -69,31 +69,37 @@ def build_marker_options(
         if llm_config.get("max_output_tokens"):
             options["max_output_tokens"] = llm_config["max_output_tokens"]
 
+        override_model = conversion_config.get("llm_model")
+
         if service == "gemini":
             if llm_config.get("gemini_api_key"):
                 options["gemini_api_key"] = llm_config["gemini_api_key"]
-            if llm_config.get("gemini_model_name"):
-                options["gemini_model_name"] = llm_config["gemini_model_name"]
+            model = override_model or llm_config.get("gemini_model_name")
+            if model:
+                options["gemini_model_name"] = model
 
         elif service == "openai":
             if llm_config.get("openai_api_key"):
                 options["openai_api_key"] = llm_config["openai_api_key"]
             if llm_config.get("openai_base_url"):
                 options["openai_base_url"] = llm_config["openai_base_url"]
-            if llm_config.get("openai_model"):
-                options["openai_model"] = llm_config["openai_model"]
+            model = override_model or llm_config.get("openai_model")
+            if model:
+                options["openai_model"] = model
 
         elif service == "claude":
             if llm_config.get("claude_api_key"):
                 options["claude_api_key"] = llm_config["claude_api_key"]
-            if llm_config.get("claude_model_name"):
-                options["claude_model_name"] = llm_config["claude_model_name"]
+            model = override_model or llm_config.get("claude_model_name")
+            if model:
+                options["claude_model_name"] = model
 
         elif service == "ollama":
             if llm_config.get("ollama_base_url"):
                 options["ollama_base_url"] = llm_config["ollama_base_url"]
-            if llm_config.get("ollama_model"):
-                options["ollama_model"] = llm_config["ollama_model"]
+            model = override_model or llm_config.get("ollama_model")
+            if model:
+                options["ollama_model"] = model
 
         elif service == "azure":
             if llm_config.get("azure_endpoint"):
@@ -102,16 +108,18 @@ def build_marker_options(
                 options["azure_api_key"] = llm_config["azure_api_key"]
             if llm_config.get("azure_api_version"):
                 options["azure_api_version"] = llm_config["azure_api_version"]
-            if llm_config.get("azure_deployment_name"):
-                options["deployment_name"] = llm_config["azure_deployment_name"]
+            model = override_model or llm_config.get("azure_deployment_name")
+            if model:
+                options["deployment_name"] = model
 
         elif service == "vertex":
             if llm_config.get("vertex_project_id"):
                 options["vertex_project_id"] = llm_config["vertex_project_id"]
             if llm_config.get("vertex_location"):
                 options["vertex_location"] = llm_config["vertex_location"]
-            if llm_config.get("gemini_model_name"):
-                options["gemini_model_name"] = llm_config["gemini_model_name"]
+            model = override_model or llm_config.get("gemini_model_name")
+            if model:
+                options["gemini_model_name"] = model
 
     options.update(conversion_config)
     return options
