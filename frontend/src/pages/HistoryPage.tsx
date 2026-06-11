@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Download,
   Trash2,
+  Check,
   RotateCcw,
   FileText,
   Loader2,
@@ -58,6 +59,23 @@ export function HistoryPage() {
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null)
   const [loadingPreviews, setLoadingPreviews] = useState<Record<string, boolean>>({})
 
+  // Delete confirmation state
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+
+  // Reset delete confirmation after 3 seconds of inactivity
+  useEffect(() => {
+    if (!deleteConfirmId) return
+    const timer = setTimeout(() => {
+      setDeleteConfirmId(null)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [deleteConfirmId])
+
+  // Reset delete confirmation when filters or page change
+  useEffect(() => {
+    setDeleteConfirmId(null)
+  }, [searchQuery, statusFilter, converterFilter, page])
+
   const fetchJobs = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -75,14 +93,21 @@ export function HistoryPage() {
     void fetchJobs()
   }, [fetchJobs])
 
-  const handleDelete = async (e: React.MouseEvent, jobId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, jobId: string) => {
     e.stopPropagation() // Prevent toggling expansion
-    if (!confirm('Are you sure you want to delete this job and its output?')) return
-    
+    if (deleteConfirmId === jobId) {
+      void executeDelete(jobId)
+    } else {
+      setDeleteConfirmId(jobId)
+    }
+  }
+
+  const executeDelete = async (jobId: string) => {
     try {
       await deleteJob(jobId)
       toast.success('Job deleted successfully')
       if (expandedJobId === jobId) setExpandedJobId(null)
+      setDeleteConfirmId(null)
       void fetchJobs()
     } catch {
       toast.error('Failed to delete job')
@@ -136,6 +161,7 @@ export function HistoryPage() {
   }, [jobs, total])
 
   const toggleExpand = async (jobId: string) => {
+    setDeleteConfirmId(null)
     const nextId = expandedJobId === jobId ? null : jobId
     setExpandedJobId(nextId)
 
@@ -278,23 +304,23 @@ export function HistoryPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3 animate-fade-in-stagger select-none">
+        <div className="divide-y divide-border/10 border-y border-border/10 animate-fade-in-stagger select-none">
           {filteredJobs.map((job) => {
             const isExpanded = expandedJobId === job.id
             return (
               <div 
                 key={job.id} 
                 className={cn(
-                  'border border-border/40 shadow-sm glass-card rounded-xl overflow-hidden transition-all duration-200 cursor-pointer',
-                  isExpanded ? 'border-primary/30 ring-1 ring-primary/10' : 'hover:border-border hover:bg-muted/5'
+                  'transition-all duration-200 cursor-pointer hover:bg-muted/10',
+                  isExpanded ? 'bg-muted/5' : 'bg-transparent'
                 )}
                 onClick={() => toggleExpand(job.id)}
               >
                   {/* Job Header Row */}
-                  <div className="flex items-center gap-4 p-4">
+                  <div className="flex items-center gap-4 py-2.5 px-3">
                     {/* File icon badge */}
-                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary shrink-0">
-                      <FileCode className="w-5 h-5" />
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary shrink-0">
+                      <FileCode className="w-4 h-4" />
                     </div>
 
                     {/* Metadata details */}
@@ -305,7 +331,7 @@ export function HistoryPage() {
                           {job.status}
                         </Badge>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-muted-foreground/90 font-medium">
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-muted-foreground/90 font-medium">
                         <span className="uppercase text-primary font-bold">{job.output_format}</span>
                         <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
                         <span>{job.converter}</span>
@@ -331,11 +357,20 @@ export function HistoryPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={(e) => handleDelete(e, job.id)}
-                        className="w-8 h-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-500"
-                        title="Delete entry"
+                        onClick={(e) => handleDeleteClick(e, job.id)}
+                        className={cn(
+                          "w-8 h-8 rounded-lg transition-all duration-200",
+                          deleteConfirmId === job.id
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                            : "hover:bg-rose-500/10 hover:text-rose-500 text-muted-foreground hover:text-rose-500"
+                        )}
+                        title={deleteConfirmId === job.id ? "Confirm delete" : "Delete entry"}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {deleteConfirmId === job.id ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
 
                       <Button
@@ -351,7 +386,7 @@ export function HistoryPage() {
 
                   {/* Expandable Details Panel */}
                   {isExpanded && (
-                    <div className="px-4 pb-4 pt-1 border-t border-border/20 bg-muted/5 animate-fade-in cursor-default select-text" onClick={(e) => e.stopPropagation()}>
+                    <div className="px-3 pb-3 pt-1 border-t border-border/10 bg-muted/5 animate-fade-in cursor-default select-text" onClick={(e) => e.stopPropagation()}>
                       <div className="space-y-3 pt-3">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="p-2.5 rounded-lg border border-border/30 bg-background/50">

@@ -39,12 +39,12 @@ export default function App() {
 
   if (initialized === null) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-6">
-        <div className="p-3 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl shadow-lg mb-4 animate-pulse">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-6">
+        <div className="p-3 bg-gradient-to-br from-stone-600 to-stone-800 dark:from-stone-700 dark:to-stone-900 rounded-2xl shadow-lg mb-4 animate-pulse">
           <Database className="h-8 w-8 text-white" />
         </div>
-        <Loader2 className="h-6 w-6 text-indigo-500 animate-spin mb-2" />
-        <p className="text-slate-400 text-sm font-medium">Checking engine status...</p>
+        <Loader2 className="h-6 w-6 text-primary animate-spin mb-2" />
+        <p className="text-muted-foreground text-sm font-medium">Checking engine status...</p>
       </div>
     )
   }

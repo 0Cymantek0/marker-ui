@@ -299,6 +299,14 @@ export async function deleteJob(jobId: string): Promise<void> {
   return request<void>(`/convert/${jobId}`, { method: 'DELETE' })
 }
 
+export async function browseFolder(): Promise<{ path: string }> {
+  return request<{ path: string }>('/convert/browse-folder')
+}
+
+export async function browseFiles(): Promise<{ paths: string[] }> {
+  return request<{ paths: string[] }>('/convert/browse-files')
+}
+
 export async function healthCheck(): Promise<{ status: string }> {
   return request<{ status: string }>('/health')
 }

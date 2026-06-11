@@ -33,7 +33,7 @@ export function TerminalLog({ logs, phase, onClear }: TerminalLogProps) {
     if (log.startsWith('[WARN]') || log.startsWith('[WARNING]')) return 'text-amber-600 dark:text-amber-400'
     if (log.startsWith('[SUCCESS]')) return 'text-emerald-600 dark:text-emerald-400 font-semibold'
     if (log.startsWith('[SYSTEM]')) return 'text-cyan-600 dark:text-cyan-400 font-medium'
-    return 'text-slate-700 dark:text-slate-300'
+    return 'text-foreground/80'
   }
 
   const getStatusText = () => {
@@ -50,15 +50,15 @@ export function TerminalLog({ logs, phase, onClear }: TerminalLogProps) {
   const isRunning = phase === 'uploading' || phase === 'processing'
 
   return (
-    <div className="glass-card flex flex-col h-[280px] bg-slate-100/50 dark:bg-slate-950 border-slate-200 dark:border-slate-900 rounded-xl overflow-hidden shadow-lg select-text">
+    <div className="glass-card flex flex-col h-[280px] bg-secondary/40 dark:bg-card border-border/80 rounded-xl overflow-hidden shadow-lg select-text">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-200/80 dark:bg-slate-900 border-b border-slate-300/60 dark:border-slate-800/80">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/80 dark:bg-secondary/60 border-b border-border/60">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-primary animate-pulse" />
-          <span className="text-xs font-mono font-bold tracking-wider text-slate-600 dark:text-slate-400">CONSOLE LOGS</span>
+          <span className="text-xs font-mono font-bold tracking-wider text-muted-foreground">CONSOLE LOGS</span>
           <span className={cn(
             'ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-widest',
-            phase === 'idle' && 'bg-slate-300/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
+            phase === 'idle' && 'bg-muted dark:bg-secondary text-muted-foreground',
             phase === 'uploading' && 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 animate-pulse',
             phase === 'processing' && 'bg-primary/20 text-primary animate-pulse',
             phase === 'completed' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -75,7 +75,7 @@ export function TerminalLog({ logs, phase, onClear }: TerminalLogProps) {
                 variant="ghost"
                 size="icon"
                 onClick={copyLogs}
-                className="w-7 h-7 hover:bg-slate-300/50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                className="w-7 h-7 hover:bg-muted dark:hover:bg-secondary text-muted-foreground hover:text-foreground"
                 title="Copy logs"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -85,7 +85,7 @@ export function TerminalLog({ logs, phase, onClear }: TerminalLogProps) {
                   variant="ghost"
                   size="icon"
                   onClick={onClear}
-                  className="w-7 h-7 hover:bg-slate-300/50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+                  className="w-7 h-7 hover:bg-muted dark:hover:bg-secondary text-muted-foreground hover:text-rose-500"
                   title="Clear console"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -99,10 +99,10 @@ export function TerminalLog({ logs, phase, onClear }: TerminalLogProps) {
       {/* Terminal lines */}
       <div
         ref={containerRef}
-        className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-800 scrollbar-track-transparent"
+        className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent"
       >
         {logs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 italic select-none">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground/80 italic select-none">
             <ArrowDownCircle className="w-6 h-6 mb-2 stroke-[1.5]" />
             <span>Console standby. Submit a file to begin extraction...</span>
           </div>
@@ -110,13 +110,13 @@ export function TerminalLog({ logs, phase, onClear }: TerminalLogProps) {
           <>
             {logs.map((log, index) => (
               <div key={index} className={cn('leading-relaxed break-all', getLogColorClass(log))}>
-                <span className="text-slate-400 dark:text-slate-600 mr-2 select-none">&gt;</span>
+                <span className="text-muted-foreground/60 mr-2 select-none">&gt;</span>
                 {log}
               </div>
             ))}
             {isRunning && (
               <div className="flex items-center text-primary font-bold">
-                <span className="text-slate-400 dark:text-slate-600 mr-2 select-none">&gt;</span>
+                <span className="text-muted-foreground/60 mr-2 select-none">&gt;</span>
                 <span className="animate-pulse">_</span>
               </div>
             )}

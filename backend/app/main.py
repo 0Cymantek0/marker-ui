@@ -86,6 +86,27 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     # Create DB tables
     await create_tables()
 
+    # Mark stale pending/processing jobs from previous sessions as failed
+    from app.database import async_session_factory
+    from app.models.job import ConversionJob
+    from sqlalchemy import update
+    from datetime import datetime, timezone
+    async with async_session_factory() as session:
+        try:
+            await session.execute(
+                update(ConversionJob)
+                .where(ConversionJob.status.in_(["pending", "processing"]))
+                .values(
+                    status="failed",
+                    error_message="Interrupted by server restart",
+                    completed_at=datetime.now(timezone.utc),
+                )
+            )
+            await session.commit()
+            logger.info("Stale pending/processing jobs from prior session marked as failed.")
+        except Exception as e:
+            logger.error("Failed to clean up stale jobs on startup: %s", e)
+
     # Apply download tracker monkeypatching
     from app.services.model_tracker import setup_monkeypatch, register_retry_callback
     setup_monkeypatch()

@@ -29,6 +29,8 @@ export interface JobState {
   logs: string[]
   outputFormat: string
   outputDir?: string
+  elapsed?: number
+  eta?: number
 }
 
 interface ConversionContextType {
@@ -157,6 +159,7 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
   }, [updateJob])
 
   const runJob = useCallback(async (job: JobState, config: ConversionConfig, outputDir?: string) => {
+    console.log("HOOK RUNJOB CALLED FOR:", job.id, "filename:", job.filename)
     updateJob(job.id, {
       phase: job.file ? 'uploading' : 'processing',
       progress: job.file ? 5 : 10,
@@ -213,14 +216,22 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
 
         updateJob(job.id, (prev) => {
           const nextLogs = [...prev.logs]
-          if (nextLogs[nextLogs.length - 1] !== `[INFO] ${messageStr}`) {
+          if (data.logs && data.logs.length > 0) {
+            data.logs.forEach((log: string) => {
+              if (!nextLogs.includes(log)) {
+                nextLogs.push(log)
+              }
+            })
+          } else if (messageStr && nextLogs[nextLogs.length - 1] !== `[INFO] ${messageStr}`) {
             nextLogs.push(`[INFO] ${messageStr}`)
           }
           return {
             ...prev,
-            progress: Math.max(prev.progress, data.progress ?? prev.progress + 3),
+            progress: Math.max(prev.progress, data.progress ?? prev.progress),
             statusText: messageStr,
             logs: nextLogs,
+            elapsed: data.elapsed,
+            eta: data.eta,
           }
         })
       })

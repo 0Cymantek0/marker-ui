@@ -241,6 +241,10 @@ async def get_status(
 
     status = job.status
     progress = job.progress
+    message = None
+    logs = None
+    elapsed = None
+    eta = None
 
     # Merge in-memory progress from task manager if still processing
     if job.status not in ("completed", "failed", "cancelled"):
@@ -250,6 +254,10 @@ async def get_status(
         if live.get("status") in ("processing", "completed", "failed", "cancelled"):
             status = live["status"]
             progress = max(progress, live.get("progress", 0))
+            message = live.get("message")
+            logs = live.get("logs")
+            elapsed = live.get("elapsed")
+            eta = live.get("eta")
 
     # Parse config to extract converter
     converter = "PdfConverter"
@@ -272,6 +280,10 @@ async def get_status(
         filename=job.original_name,
         output_format=job.output_format,
         converter=converter,
+        message=message,
+        logs=logs,
+        elapsed=elapsed,
+        eta=eta,
     )
 
 
@@ -441,3 +453,56 @@ async def delete_job(
     await db.delete(job)
 
     return {"status": "deleted", "job_id": job_id}
+
+
+def _browse_folder_dialog() -> str:
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    folder_path = filedialog.askdirectory(title="Select Directory")
+    root.destroy()
+    return folder_path
+
+
+def _browse_files_dialog() -> list[str]:
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    file_paths = filedialog.askopenfilenames(
+        title="Select Files",
+        filetypes=[
+            ("Supported Files", "*.pdf;*.docx;*.pptx;*.xlsx;*.epub;*.html;*.jpg;*.jpeg;*.png;*.webp;*.tiff;*.bmp"),
+            ("All Files", "*.*")
+        ]
+    )
+    root.destroy()
+    return list(file_paths)
+
+
+@router.get("/browse-folder")
+async def browse_folder() -> dict[str, str]:
+    """Open a native folder selection dialog and return the selected path."""
+    import asyncio
+    try:
+        path = await asyncio.to_thread(_browse_folder_dialog)
+        return {"path": path}
+    except Exception as e:
+        logger.exception("Failed to open folder dialog")
+        raise HTTPException(status_code=500, detail=f"Failed to open folder dialog: {e}")
+
+
+@router.get("/browse-files")
+async def browse_files() -> dict[str, list[str]]:
+    """Open a native file selection dialog and return the selected paths."""
+    import asyncio
+    try:
+        paths = await asyncio.to_thread(_browse_files_dialog)
+        return {"paths": paths}
+    except Exception as e:
+        logger.exception("Failed to open file dialog")
+        raise HTTPException(status_code=500, detail=f"Failed to open file dialog: {e}")
+

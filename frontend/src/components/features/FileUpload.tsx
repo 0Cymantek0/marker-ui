@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from 'react'
 import { UploadCloud, FileText, X, FileImage, FileCode, FileSpreadsheet, FolderOpen, Files, Link } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
+import { browseFiles, browseFolder } from '@/lib/api'
+import { toast } from 'sonner'
 
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.xlsx,.pptx,.epub,.html,.htm,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff'
 
@@ -51,6 +53,33 @@ export function FileUpload({
   const [activeTab, setActiveTab] = useState<'upload' | 'local'>('upload')
   const [isDragOver, setIsDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleBrowseLocalFiles = async () => {
+    try {
+      const res = await browseFiles()
+      if (res.paths && res.paths.length > 0) {
+        const newPaths = res.paths.join('\n')
+        onLocalPathsChange(localPaths ? `${localPaths}\n${newPaths}` : newPaths)
+        toast.success(`Added ${res.paths.length} file path(s)`)
+      }
+    } catch (err) {
+      console.error('Failed to browse files:', err)
+      toast.error('Failed to open file browser')
+    }
+  }
+
+  const handleBrowseOutputDir = async () => {
+    try {
+      const res = await browseFolder()
+      if (res.path) {
+        onOutputDirChange(res.path)
+        toast.success('Output folder updated')
+      }
+    } catch (err) {
+      console.error('Failed to browse folder:', err)
+      toast.error('Failed to open folder browser')
+    }
+  }
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -127,7 +156,7 @@ export function FileUpload({
             className={cn(
               'relative flex flex-col items-center justify-center gap-4 p-8 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-300 ease-out select-none',
               isDragOver
-                ? 'border-primary bg-primary/5 scale-[1.01) shadow-md shadow-primary/5'
+                ? 'border-primary bg-primary/5 scale-[1.01] shadow-md shadow-primary/5'
                 : 'border-border/60 hover:border-primary/50 hover:bg-muted/20',
               disabled && 'opacity-50 pointer-events-none'
             )}
@@ -207,10 +236,21 @@ export function FileUpload({
         </div>
       ) : (
         /* Local paths text area */
-        <div className="space-y-2">
-          <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase block">
-            Absolute Local File Paths (One Per Line)
-          </label>
+        <div className="space-y-2 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase block">
+              Absolute Local File Paths (One Per Line)
+            </label>
+            <button
+              type="button"
+              onClick={handleBrowseLocalFiles}
+              disabled={disabled}
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80 transition-all hover:translate-x-0.5 active:scale-95"
+            >
+              <FolderOpen className="w-3 h-3" />
+              Browse Files...
+            </button>
+          </div>
           <textarea
             disabled={disabled}
             value={localPaths}
@@ -232,13 +272,24 @@ export function FileUpload({
             Output Folder Path (Optional)
           </label>
         </div>
-        <Input
-          disabled={disabled}
-          value={outputDir}
-          onChange={(e) => onOutputDirChange(e.target.value)}
-          placeholder="e.g. C:\path\to\output_folder"
-          className="bg-background/50 h-9 text-xs"
-        />
+        <div className="flex gap-2">
+          <Input
+            disabled={disabled}
+            value={outputDir}
+            onChange={(e) => onOutputDirChange(e.target.value)}
+            placeholder="e.g. C:\path\to\output_folder"
+            className="bg-background/50 h-9 text-xs flex-1 rounded-xl"
+          />
+          <button
+            type="button"
+            onClick={handleBrowseOutputDir}
+            disabled={disabled}
+            className="px-3 text-xs font-bold uppercase tracking-wider border border-border/80 hover:bg-muted/40 rounded-xl transition-all flex items-center gap-1.5 shrink-0 bg-background/50 shadow-sm active:scale-95"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            Browse...
+          </button>
+        </div>
         <p className="text-[9px] text-muted-foreground/75 leading-normal">
           * Leave blank to save to the default directory (or same folder as the input file when using local paths).
         </p>

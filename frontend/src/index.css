@@ -7,57 +7,57 @@
 @layer base {
   /* ─── Light theme ─── */
   :root {
-    --background: 210 20% 97.5%;       /* soft slate off-white */
-    --foreground: 215 25% 15%;         /* soft navy-slate charcoal */
+    --background: 24 8% 97.5%;        /* warm stone off-white */
+    --foreground: 24 6% 12%;          /* warm dark charcoal */
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 24 6% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
-    --primary: 215 25% 20%;            /* soft slate gray */
-    --primary-foreground: 210 20% 98%; /* soft white */
-    --secondary: 210 16% 93%;          /* soft gray-blue */
-    --secondary-foreground: 215 25% 15%;
-    --muted: 210 16% 93%;
-    --muted-foreground: 215 12% 46%;   /* slate-500 */
-    --accent: 210 16% 93%;
-    --accent-foreground: 215 25% 15%;
+    --popover-foreground: 24 6% 12%;
+    --primary: 24 6% 18%;             /* warm charcoal-gray */
+    --primary-foreground: 24 8% 98%;  /* warm white */
+    --secondary: 24 6% 92.5%;         /* soft warm gray */
+    --secondary-foreground: 24 6% 12%;
+    --muted: 24 6% 92.5%;
+    --muted-foreground: 24 4% 45%;    /* stone-500 */
+    --accent: 24 6% 92.5%;
+    --accent-foreground: 24 6% 12%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 16% 89%;             /* soft gray-blue border */
-    --input: 210 16% 89%;
-    --ring: 215 25% 20%;
+    --border: 24 6% 88%;              /* soft warm gray border */
+    --input: 24 6% 88%;
+    --ring: 24 6% 18%;
     --radius: 0.75rem;
 
     /* Glassmorphism helpers */
     --glass-bg: 0 0% 100% / 0.6;
-    --glass-border: 210 16% 89% / 0.4;
+    --glass-border: 24 6% 88% / 0.4;
     --glass-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.05);
   }
 
   /* ─── Dark theme ─── */
   .dark {
-    --background: 222 20% 12%;         /* soft deep midnight-slate */
-    --foreground: 215 15% 82%;         /* soft silver-gray */
-    --card: 222 20% 14%;               /* soft elevated dark card */
-    --card-foreground: 215 15% 82%;
-    --popover: 222 20% 13%;
-    --popover-foreground: 215 15% 82%;
-    --primary: 215 15% 88%;            /* soft light silver-white */
-    --primary-foreground: 222 20% 12%; /* dark color text */
-    --secondary: 222 15% 18%;          /* softer slate-800 highlight */
-    --secondary-foreground: 215 15% 88%;
-    --muted: 222 15% 18%;
-    --muted-foreground: 215 10% 58%;   /* slate-400 */
-    --accent: 222 15% 18%;
-    --accent-foreground: 215 15% 88%;
+    --background: 24 5% 7.5%;         /* warm absolute greyscale/charcoal */
+    --foreground: 24 5% 86%;          /* warm light stone-gray */
+    --card: 24 5% 10.5%;              /* warm elevated dark card */
+    --card-foreground: 24 5% 86%;
+    --popover: 24 5% 9.5%;
+    --popover-foreground: 24 5% 86%;
+    --primary: 24 5% 92%;             /* warm silver-white */
+    --primary-foreground: 24 5% 7.5%; /* dark warm color text */
+    --secondary: 24 5% 14%;           /* stone-800 highlight */
+    --secondary-foreground: 24 5% 92%;
+    --muted: 24 5% 14%;
+    --muted-foreground: 24 3% 62%;    /* stone-400 */
+    --accent: 24 5% 14%;
+    --accent-foreground: 24 5% 92%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 222 15% 20%;             /* soft border */
-    --input: 222 15% 20%;
-    --ring: 215 15% 82%;
+    --border: 24 5% 15%;              /* warm border */
+    --input: 24 5% 15%;
+    --ring: 24 5% 85%;
 
-    --glass-bg: 222 20% 12% / 0.5;
-    --glass-border: 222 15% 20% / 0.3;
+    --glass-bg: 24 5% 7.5% / 0.5;
+    --glass-border: 24 5% 15% / 0.3;
     --glass-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.3);
   }
 

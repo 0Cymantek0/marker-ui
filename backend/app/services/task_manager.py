@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, AsyncGenerator
 
 import aiofiles
+import threading
+import time
 from fastapi import Request
 from sse_starlette.event import ServerSentEvent
 
@@ -26,6 +28,26 @@ logger = logging.getLogger(__name__)
 SSE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
 
 
+# Registry of thread ID to job ID
+active_conversion_threads: dict[int, str] = {}
+
+
+class JobLogHandler(logging.Handler):
+    def __init__(self, task_manager: TaskManager) -> None:
+        super().__init__()
+        self.task_manager = task_manager
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            thread_ident = threading.get_ident()
+            job_id = active_conversion_threads.get(thread_ident)
+            if job_id:
+                message = self.format(record)
+                self.task_manager.add_job_log(job_id, message, record.levelname)
+        except Exception:
+            pass
+
+
 class TaskManager:
     """Manages background conversion tasks with progress tracking."""
 
@@ -34,6 +56,19 @@ class TaskManager:
         self._tasks: dict[str, asyncio.Future[Any]] = {}
         self._progress: dict[str, int] = {}
         self._pids: dict[str, int] = {}
+        
+        # In-memory logs and status texts
+        self._job_logs: dict[str, list[str]] = {}
+        self._job_status_text: dict[str, str] = {}
+        self._job_start_time: dict[str, float] = {}
+
+        # Register custom log handler for marker and app
+        self._log_handler = JobLogHandler(self)
+        self._log_handler.setFormatter(
+            logging.Formatter("[%(levelname)s] %(message)s")
+        )
+        logging.getLogger("marker").addHandler(self._log_handler)
+        logging.getLogger("app").addHandler(self._log_handler)
 
     # ------------------------------------------------------------------
     # Submit
@@ -57,7 +92,10 @@ class TaskManager:
             marker_service,
         )
         self._tasks[job_id] = future
-        self._progress[job_id] = 0
+        self._progress[job_id] = 10
+        self._job_logs[job_id] = []
+        self._job_status_text[job_id] = "Starting conversion..."
+        self._job_start_time[job_id] = time.time()
 
         def _on_done(fut: asyncio.Future[Any]) -> None:
             exc = fut.exception()
@@ -67,9 +105,52 @@ class TaskManager:
 
         future.add_done_callback(_on_done)
 
+        # Smooth progress increments
+        async def _smooth_progress():
+            while job_id in self._tasks:
+                fut = self._tasks[job_id]
+                if fut.done():
+                    break
+                await asyncio.sleep(2)
+                current = self._progress.get(job_id, 10)
+                if current < 85:
+                    self._progress[job_id] = current + 1
+
+        loop.create_task(_smooth_progress())
+
     # ------------------------------------------------------------------
     # Status helpers
     # ------------------------------------------------------------------
+
+    def add_job_log(self, job_id: str, message: str, levelname: str) -> None:
+        if job_id not in self._job_logs:
+            self._job_logs[job_id] = []
+        
+        # Append message
+        self._job_logs[job_id].append(message)
+        
+        # Parse log content to update status text and progress hints
+        msg_lower = message.lower()
+        if "layout" in msg_lower:
+            self._job_status_text[job_id] = "Detecting document layout..."
+            if self._progress.get(job_id, 0) < 30:
+                self._progress[job_id] = 30
+        elif "ocr" in msg_lower or "recognition" in msg_lower or "detector" in msg_lower:
+            self._job_status_text[job_id] = "Performing OCR and text recognition..."
+            if self._progress.get(job_id, 0) < 50:
+                self._progress[job_id] = 50
+        elif "table" in msg_lower:
+            self._job_status_text[job_id] = "Extracting tables..."
+            if self._progress.get(job_id, 0) < 70:
+                self._progress[job_id] = 70
+        elif "math" in msg_lower:
+            self._job_status_text[job_id] = "Formatting mathematical equations..."
+            if self._progress.get(job_id, 0) < 80:
+                self._progress[job_id] = 80
+        elif "markdown" in msg_lower or "html" in msg_lower or "json" in msg_lower:
+            self._job_status_text[job_id] = "Generating structured output..."
+            if self._progress.get(job_id, 0) < 90:
+                self._progress[job_id] = 90
 
     def get_status(self, job_id: str) -> dict[str, Any]:
         """Return current in-memory progress for *job_id*."""
@@ -82,7 +163,30 @@ class TaskManager:
             status = "failed" if exc else "completed"
         else:
             status = "processing"
-        return {"job_id": job_id, "status": status, "progress": progress}
+
+        message = self._job_status_text.get(job_id, "Processing document...")
+        logs = self._job_logs.get(job_id, [])
+
+        # Calculate elapsed and ETA
+        start_time = self._job_start_time.get(job_id)
+        elapsed = int(time.time() - start_time) if start_time else 0
+        eta = 0
+        if status == "processing":
+            if progress > 10 and progress < 100:
+                estimated_total = elapsed * 100 / progress
+                eta = max(1, int(estimated_total - elapsed))
+            else:
+                eta = 45  # Default fallback
+
+        return {
+            "job_id": job_id,
+            "status": status,
+            "progress": progress,
+            "message": message,
+            "logs": logs,
+            "elapsed": elapsed,
+            "eta": eta
+        }
 
     async def cancel_job(self, job_id: str) -> bool:
         """Attempt to cancel a running job and kill its underlying process."""
@@ -102,6 +206,9 @@ class TaskManager:
 
     @staticmethod
     def _kill_pid(pid: int) -> None:
+        if pid == os.getpid():
+            logger.info("Refusing to kill own main server process (PID %d)", pid)
+            return
         try:
             if sys.platform == "win32":
                 subprocess.call(
@@ -137,21 +244,22 @@ class TaskManager:
         timeout of SSE_TIMEOUT_SECONDS.
         """
         last_progress = -1
+        last_log_len = 0
         elapsed = 0.0
 
         while True:
             if await request.is_disconnected():
                 # Release the SSE connection handler, but DO NOT pop/cancel the background task!
-                # This allows the background conversion task to continue executing and allows
-                # the client to reconnect or query status later.
                 return
 
             info = self.get_status(job_id)
             progress = info["progress"]
             status = info["status"]
+            current_log_len = len(info.get("logs", []))
 
-            if progress != last_progress or status in ("completed", "failed", "cancelled"):
+            if progress != last_progress or current_log_len != last_log_len or status in ("completed", "failed", "cancelled"):
                 last_progress = progress
+                last_log_len = current_log_len
                 is_terminal = status in ("completed", "failed", "cancelled")
                 event_type = "status" if is_terminal else "progress"
                 yield ServerSentEvent(
@@ -184,10 +292,14 @@ class TaskManager:
     ) -> dict[str, Any]:
         """Runs inside ThreadPoolExecutor — updates DB on completion."""
         self._pids[job_id] = os.getpid()
+        thread_ident = threading.get_ident()
+        active_conversion_threads[thread_ident] = job_id
         try:
             self._progress[job_id] = 10
+            self._job_status_text[job_id] = "Loading marker converters..."
             result = marker_service.convert_file(filepath, dict(config))
             self._progress[job_id] = 90
+            self._job_status_text[job_id] = "Finalizing results..."
 
             # Persist result synchronously via a new async loop
             try:
@@ -204,10 +316,12 @@ class TaskManager:
                 finally:
                     loop.close()
             self._progress[job_id] = 100
+            self._job_status_text[job_id] = "Conversion completed successfully."
             return result
         except Exception as exc:
             logger.exception("Conversion failed for job %s", job_id)
             self._progress[job_id] = 0
+            self._job_status_text[job_id] = f"Conversion failed: {exc}"
             try:
                 asyncio.run(self._fail_job(job_id, str(exc)))
             except RuntimeError:
@@ -221,6 +335,7 @@ class TaskManager:
                 logger.exception("Failed to record error for job %s", job_id)
             raise
         finally:
+            active_conversion_threads.pop(thread_ident, None)
             self._pids.pop(job_id, None)
 
     # ------------------------------------------------------------------
@@ -229,7 +344,7 @@ class TaskManager:
 
     async def _update_job_status(self, job_id: str, status: str) -> None:
         async with async_session_factory() as session:
-            from sqlalchemy import select, update
+            from sqlalchemy import update
 
             await session.execute(
                 update(ConversionJob)
@@ -244,6 +359,16 @@ class TaskManager:
         result: dict[str, Any],
         config: dict[str, Any],
     ) -> None:
+        # Check if job still exists and is not cancelled
+        async with async_session_factory() as session:
+            from sqlalchemy import select
+            stmt = select(ConversionJob.status).where(ConversionJob.id == job_id)
+            res = await session.execute(stmt)
+            status = res.scalar_one_or_none()
+            if not status or status == "cancelled":
+                logger.info("Job %s was cancelled or deleted. Skipping finalization.", job_id)
+                return
+
         result_text = result.get("text", "")
         images = result.get("images", {})
         output_format = config.get("output_format", "markdown")
@@ -312,6 +437,7 @@ class TaskManager:
             await session.execute(
                 update(ConversionJob)
                 .where(ConversionJob.id == job_id)
+                .where(ConversionJob.status != "cancelled")
                 .values(
                     status="completed",
                     result_text=result_text,
@@ -324,7 +450,13 @@ class TaskManager:
 
     async def _fail_job(self, job_id: str, error_message: str) -> None:
         async with async_session_factory() as session:
-            from sqlalchemy import update
+            from sqlalchemy import select, update
+            stmt = select(ConversionJob.status).where(ConversionJob.id == job_id)
+            res = await session.execute(stmt)
+            status = res.scalar_one_or_none()
+            if not status or status == "cancelled":
+                logger.info("Job %s was cancelled or deleted. Skipping failure recording.", job_id)
+                return
 
             # Only mark as failed if not already in a terminal state (e.g. cancelled)
             await session.execute(
@@ -338,3 +470,4 @@ class TaskManager:
                 )
             )
             await session.commit()
+
