@@ -4,20 +4,20 @@ Marker UI is a high-performance, local-first web interface for [marker](https://
 
 ---
 
-## 🎯 The Problem
+## The Problem
 Document conversion is often a trade-off between speed and accuracy. Standard tools struggle with layout preservation, OCR errors, and mathematical notation. Furthermore, many high-quality engines require cloud uploads, compromising privacy for sensitive internal documents.
 
-## 🛡️ The Mitigation
+## The Mitigation
 Marker UI bridges the gap by providing a **private, local-first workflow** that utilizes neural network pipelines to "read" documents like a human. It supports high-fidelity layout segmentation, neural OCR, and optional LLM-assisted refinement—all running entirely on your own infrastructure.
 
-## ⚠️ Known Limitations & Roadmap
+## Known Limitations & Roadmap
 - **Hardware Requirements**: Neural models require significant RAM/VRAM. Machines without dedicated GPUs may experience slower conversion times.
 - **Table Complexity**: While advanced, extremely large or deeply nested tables may still require manual touch-ups.
 - **Coming Soon**: Integrated Markdown editor for immediate post-conversion refinement and bulk export for massive datasets.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 - **Multi-Format Ingestion**: Convert PDF, DOCX, PPTX, XLSX, EPUB, HTML, and images (JPG, PNG, WebP, TIFF, BMP).
 - **Neural Processing Pipeline**: Sequential steps for Text Detection, Layout Segmentation, OCR, Table Analysis, and Error Refinement.
@@ -28,7 +28,7 @@ Marker UI bridges the gap by providing a **private, local-first workflow** that 
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Quick Start (Docker)
 The easiest way to run Marker UI is via Docker Compose:
@@ -64,7 +64,7 @@ Open `http://localhost:5173` for the development interface.
 
 ---
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### 1. One-Time Setup (Onboarding)
 Upon first launch, Marker UI will initialize its **Neural Engine**.
@@ -91,7 +91,7 @@ Go to the **Settings** page to manage:
 
 ---
 
-## 🛠️ Developer Guide
+## Developer Guide
 
 ### Architecture
 Marker UI follows a modern decoupled architecture:
@@ -109,7 +109,7 @@ Tests cover everything from Fernet encryption and masked credentials to SSE stre
 
 ---
 
-## ⚖️ License
+## License
 
 Marker UI is built on top of the powerful [marker](https://github.com/datalab-to/marker) engine and is licensed under the **GPL-3.0 License**.
 

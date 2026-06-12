@@ -4,7 +4,7 @@ This guide provides an in-depth look at the technical foundations of Marker UI, 
 
 ---
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 Marker UI is designed as a stateless API with a persistent, local-first database.
 
@@ -37,7 +37,7 @@ marker-ui/
 
 ---
 
-## 🚀 Development Workflow
+## Development Workflow
 
 ### 1. Environment Configuration
 Copy the `.env.example` to `.env` in the root or `backend` folder.
@@ -62,7 +62,7 @@ Marker UI uses **Fernet symmetric encryption** to protect LLM API keys.
 
 ---
 
-## 🧪 Testing Strategy
+## Testing Strategy
 
 Quality is verified across multiple layers:
 - **Unit Tests**: Encryption logic, model validation, and utility functions.
@@ -77,7 +77,7 @@ python -m pytest tests/ -v
 
 ---
 
-## 🎨 UI & UX Standards
+## UI & UX Standards
 
 We prioritize a **High-Density, Low-Clutter** interface.
 - **Typography**: Uses the project's default sans-serif stack with heavy tracking on headers.
@@ -89,7 +89,7 @@ The `OnboardingPage` is the gatekeeper of the application. It ensures that all r
 
 ---
 
-## 📝 Contribution Guidelines
+## Contribution Guidelines
 
 1. **Surgical Changes**: Keep PRs focused. Avoid large refactors unless explicitly requested.
 2. **Type Safety**: All new Python code should be type-hinted; React components must use strict TypeScript interfaces.
