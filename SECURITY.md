@@ -20,7 +20,7 @@ Marker UI runs locally. The primary security boundaries are:
 > If you discover a security vulnerability in Marker UI, please do **not** open a public issue.
 
 Instead, report it privately:
-1. Email the maintainers at [security@marker-ui.local] (or use the designated security email for your fork).
+1. Email the maintainers at [cymantekfnosz@gmail.com] (or use the designated security email for your fork).
 2. Include a detailed description of the vulnerability, steps to reproduce, and a proof of concept (PoC) if available.
 3. We will acknowledge receipt of your report within 48 hours and work with you to patch it quickly.
 
