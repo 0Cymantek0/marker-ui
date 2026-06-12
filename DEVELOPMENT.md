@@ -95,6 +95,3 @@ The `OnboardingPage` is the gatekeeper of the application. It ensures that all r
 2. **Type Safety**: All new Python code should be type-hinted; React components must use strict TypeScript interfaces.
 3. **Document as you Code**: Update this guide if you introduce new services or architectural patterns.
 4. **License Compliance**: As this project is GPL-3.0, ensure all new dependencies are compatible.
-
----
-*For more information, please check the [README.md](../README.md).*

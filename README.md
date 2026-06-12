@@ -1,6 +1,6 @@
 # Marker UI
 
-Marker UI is a high-performance, local-first web interface for [marker](https://github.com/datalab-to/marker), the state-of-the-art document-to-markdown conversion engine. It transforms complex documents—PDFs with multiple columns, equations, and tables—into clean, structured, and production-ready Markdown, JSON, or HTML.
+Marker UI is a high-performance, local-first web interface for [marker](https://github.com/datalab-to/marker), the state-of-the-art document-to-markdown conversion engine. It transforms complex documents (PDFs with multiple columns, equations, and tables) into clean, structured, and production-ready Markdown, JSON, or HTML.
 
 ---
 
@@ -8,12 +8,10 @@ Marker UI is a high-performance, local-first web interface for [marker](https://
 Document conversion is often a trade-off between speed and accuracy. Standard tools struggle with layout preservation, OCR errors, and mathematical notation. Furthermore, many high-quality engines require cloud uploads, compromising privacy for sensitive internal documents.
 
 ## The Mitigation
-Marker UI bridges the gap by providing a **private, local-first workflow** that utilizes neural network pipelines to "read" documents like a human. It supports high-fidelity layout segmentation, neural OCR, and optional LLM-assisted refinement—all running entirely on your own infrastructure.
+Marker UI bridges the gap by providing a **private, local-first workflow** that utilizes neural network pipelines to "read" documents like a human. It supports high-fidelity layout segmentation, neural OCR, and optional LLM-assisted refinement, all running entirely on your own infrastructure.
 
 ## Known Limitations & Roadmap
-- **Hardware Requirements**: Neural models require significant RAM/VRAM. Machines without dedicated GPUs may experience slower conversion times.
-- **Table Complexity**: While advanced, extremely large or deeply nested tables may still require manual touch-ups.
-- **Coming Soon**: Integrated Markdown editor for immediate post-conversion refinement and bulk export for massive datasets.
+Still images get linked into the markdown file, separated from the PDF, and we have to download it as a zip to maintain the folder structure so that the images can be linked in the markdown. For a model that has no vision, this becomes difficult to read the whole thing. We will find a way to have very accurate descriptions of images or representations of any chart or anything that is context-aware about the whole markdown file and would represent the visual aspects in text in a very lossless manner, as good as possible.
 
 ---
 
@@ -112,6 +110,3 @@ Tests cover everything from Fernet encryption and masked credentials to SSE stre
 ## License
 
 Marker UI is built on top of the powerful [marker](https://github.com/datalab-to/marker) engine and is licensed under the **GPL-3.0 License**.
-
----
-*Maintained by the Marker UI Community. Built for speed, privacy, and precision.*
