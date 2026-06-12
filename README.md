@@ -1,70 +1,58 @@
 # Marker UI
 
-A modern, local-first web interface for [marker](https://github.com/datalab-to/marker), the document-to-markdown conversion engine. Marker UI allows you to convert PDFs, DOCX, PPTX, XLSX, EPUB, HTML, and images into clean Markdown, JSON, or HTML with real-time progress tracking and optional LLM-enhanced conversion.
+Marker UI is a high-performance, local-first web interface for [marker](https://github.com/datalab-to/marker), the state-of-the-art document-to-markdown conversion engine. It transforms complex documents—PDFs with multiple columns, equations, and tables—into clean, structured, and production-ready Markdown, JSON, or HTML.
 
-## Features
+---
 
-- **Multi-format input**: Supports PDF, DOCX, XLSX, PPTX, EPUB, HTML, and images (JPG, PNG, WebP, TIFF, BMP).
-- **Multiple output formats**: Export to Markdown, JSON, HTML, or structured chunks.
-- **LLM-enhanced conversion**: Connect to Gemini, Claude, OpenAI, Azure OpenAI, Ollama, or Vertex AI for improved layout parsing and formatting.
-- **Real-time progress**: Live updates during document processing powered by Server-Sent Events (SSE).
-- **Local-first security**: API keys and settings are stored locally in an encrypted database. No environment variables are required.
-- **User-friendly interface**: Simple and clean UI designed for ease of use.
-- **Docker-ready**: Deploy the entire application with a single command.
+## 🎯 The Problem
+Document conversion is often a trade-off between speed and accuracy. Standard tools struggle with layout preservation, OCR errors, and mathematical notation. Furthermore, many high-quality engines require cloud uploads, compromising privacy for sensitive internal documents.
 
-## Security Model
+## 🛡️ The Mitigation
+Marker UI bridges the gap by providing a **private, local-first workflow** that utilizes neural network pipelines to "read" documents like a human. It supports high-fidelity layout segmentation, neural OCR, and optional LLM-assisted refinement—all running entirely on your own infrastructure.
 
-Marker UI is designed as a **local-first personal tool** that runs on your local machine.
+## ⚠️ Known Limitations & Roadmap
+- **Hardware Requirements**: Neural models require significant RAM/VRAM. Machines without dedicated GPUs may experience slower conversion times.
+- **Table Complexity**: While advanced, extremely large or deeply nested tables may still require manual touch-ups.
+- **Coming Soon**: Integrated Markdown editor for immediate post-conversion refinement and bulk export for massive datasets.
 
-- **Localhost by default**: Docker binds to `127.0.0.1:3000` by default so the application is not exposed to your network.
-- **Encrypted settings**: Sensitive settings (such as LLM API keys) are stored encrypted (using Fernet symmetric encryption) in a local SQLite database.
-- **Masked credentials**: API keys are masked in settings responses (`sk-****abcd`) so they never appear in plain text in browser developer tools.
-- **SSRF protection**: LLM test connections are restricted to a verified allowlist of service hosts.
-- **Upload safety**: Limits file uploads to 100 MB, validates file extensions, and streams writes directly to disk to minimize memory consumption.
+---
 
-## Quick Start
+## ✨ Key Features
 
-### Running with Docker (Recommended)
+- **Multi-Format Ingestion**: Convert PDF, DOCX, PPTX, XLSX, EPUB, HTML, and images (JPG, PNG, WebP, TIFF, BMP).
+- **Neural Processing Pipeline**: Sequential steps for Text Detection, Layout Segmentation, OCR, Table Analysis, and Error Refinement.
+- **LLM-Enhanced Refinement**: Optional integration with Gemini, Claude, OpenAI (including O1/O3), Azure, Ollama, and Vertex AI for superior formatting.
+- **Local-First Security**: API keys are encrypted (Fernet) and stored in a local SQLite database. No credentials are ever sent to our servers.
+- **Real-Time Execution Terminal**: Track conversion progress, logs, and estimated completion times (ETA) via a sleek internal console.
+- **Zero-Config Docker Deployment**: Spin up the entire stack, including Nginx and the FastAPI backend, with a single command.
 
-To run the latest pre-built image from Github Container Registry (GHCR):
+---
+
+## 🚀 Getting Started
+
+### Quick Start (Docker)
+The easiest way to run Marker UI is via Docker Compose:
 
 ```bash
 docker compose up -d
 ```
+Visit `http://localhost:3000` to begin.
 
-Once started, open `http://localhost:3000` in your browser.
-
-To update to the latest version:
-```bash
-docker compose pull && docker compose up -d
-```
-
-#### Customizing Configuration (Optional)
-By default, the application is accessible only on localhost. If you need to expose it on your local network, modify the ports section in `docker-compose.yml`:
-
-```yaml
-ports:
-  - "3000:80"
-```
-
-> [!WARNING]
-> If you expose the application on your network, make sure to set `MARKER_ACCESS_TOKEN` in your `.env` file to require authentication headers on API calls.
-
----
-
-### Running from Source (Development)
-
-To run the application manually, ensure you have Python 3.10+ and Node.js 18+ installed.
+### Running from Source
+Ensure you have **Python 3.10+** and **Node.js 18+** installed.
 
 #### 1. Backend Setup
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # On Windows use: .venv\Scripts\Activate.ps1
+# Linux/macOS:
+source .venv/bin/activate
+# Windows:
+.venv\Scripts\activate.ps1
+
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
-The backend API documentation will be available at `http://localhost:8000/docs`.
 
 #### 2. Frontend Setup
 ```bash
@@ -72,30 +60,58 @@ cd frontend
 pnpm install
 pnpm dev
 ```
-The frontend application will be available at `http://localhost:5173`.
+Open `http://localhost:5173` for the development interface.
 
 ---
 
-## Configuration
+## 📖 Usage Guide
 
-The application can be customized using the following environment variables (defined in your `.env` file):
+### 1. One-Time Setup (Onboarding)
+Upon first launch, Marker UI will initialize its **Neural Engine**.
+- **Engine Console**: Displays real-time download speed, progress, and file validation.
+- **Pipeline Visualizer**: Shows the status of each neural model (Text Detection, OCR, etc.).
+- **Developer Console**: Provides a verbose diagnostic log for technical users.
+*Note: This process may take several minutes depending on your internet speed.*
 
-| Variable | Default | Description |
-|---|---|---|
-| `MARKER_HOST` | `0.0.0.0` | Backend bind address |
-| `MARKER_PORT` | `8000` | Backend bind port |
-| `MARKER_DEBUG` | `false` | Enable debug logging |
-| `MARKER_ACCESS_TOKEN` | *(unset)* | If set, requests must include `x-access-token` header |
-| `MARKER_MAX_UPLOAD_SIZE` | `104857600` | Max file upload size in bytes (default 100 MB) |
-| `MARKER_DATABASE_URL` | `sqlite+aiosqlite:///data/marker_ui.db` | SQLite database connection string |
-| `MARKER_SECRET_KEY_PATH` | `data/.secret_key` | Path to the Fernet encryption key file |
+### 2. Converting Documents
+Navigate to the **Convert** page:
+- **Upload Zone**: Drag and drop files or select multiple documents.
+- **Local Absolute Paths**: For server-side users, you can specify direct file paths on the host machine to avoid large uploads.
+- **Conversion Parameters**:
+    - **Output Format**: Choose Markdown (default), JSON, HTML, or Chunks.
+    - **Converter**: Select `PdfConverter` for standard docs or `TableConverter` for data-heavy files.
+    - **LLM Boost**: Enable this to use connected LLMs for fixing layout breaks and OCR slips.
+- **Execution Console**: Toggle the terminal to see live logs of the conversion process.
+
+### 3. Settings & LLM Config
+Go to the **Settings** page to manage:
+- **LLM Providers**: Securely add API keys for Gemini, Claude, or OpenAI.
+- **Model Overrides**: Customize which specific models (e.g., `gpt-4o`, `claude-3-5-sonnet`) are used for refinement.
+- **Database Management**: View your conversion history and purge old records to save space.
 
 ---
 
-## Development & Architecture
+## 🛠️ Developer Guide
 
-For details on the project folder structure, API endpoints, running tests, or managing database migrations, please refer to [DEVELOPMENT.md](DEVELOPMENT.md).
+### Architecture
+Marker UI follows a modern decoupled architecture:
+- **Backend**: FastAPI (Python) handles the heavy lifting, using SQLAlchemy (Async SQLite) for persistence and `sse-starlette` for real-time events.
+- **Frontend**: Vite-based React 19 application using `shadcn/ui` and `Tailwind CSS`.
+- **Worker**: An internal task manager handles the conversion queue to prevent blocking the main API thread.
 
-## License
+### Testing
+We maintain high coverage to ensure reliability:
+```bash
+cd backend
+python -m pytest tests/
+```
+Tests cover everything from Fernet encryption and masked credentials to SSE stream integrity.
 
-Marker UI is built on top of [marker](https://github.com/datalab-to/marker) and is licensed under the **GPL-3.0 license**.
+---
+
+## ⚖️ License
+
+Marker UI is built on top of the powerful [marker](https://github.com/datalab-to/marker) engine and is licensed under the **GPL-3.0 License**.
+
+---
+*Maintained by the Marker UI Community. Built for speed, privacy, and precision.*
