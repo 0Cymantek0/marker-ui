@@ -4,6 +4,7 @@ import time
 import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 import requests
 
 logger = logging.getLogger(__name__)
@@ -379,3 +380,214 @@ def register_retry_callback(cb) -> None:
 def trigger_retry() -> None:
     if _retry_callback:
         _retry_callback()
+
+
+def self_heal_check() -> Dict[str, Any]:
+    """Verify integrity of all model checkpoints, clean corrupt files, and re-download."""
+    try:
+        from surya.common.s3 import S3DownloaderMixin, check_manifest
+        from surya.settings import settings as surya_settings
+        import shutil
+        import json
+    except ImportError:
+        return {"success": False, "message": "Surya package not installed"}
+
+    checkpoints = {
+        "layout": surya_settings.LAYOUT_MODEL_CHECKPOINT,
+        "text_recognition": surya_settings.RECOGNITION_MODEL_CHECKPOINT,
+        "table_recognition": surya_settings.TABLE_REC_MODEL_CHECKPOINT,
+        "text_detection": surya_settings.DETECTOR_MODEL_CHECKPOINT,
+        "ocr_error_detection": surya_settings.OCR_ERROR_MODEL_CHECKPOINT,
+    }
+
+    healed_count = 0
+    issues = []
+
+    # Clear in-memory model dictionary first if any models exist
+    try:
+        from app.main import _app_state
+        with _app_state.marker_service._lock:
+            _app_state.marker_service._model_dict = None
+            _app_state.marker_service._initialized = False
+    except Exception:
+        pass
+
+    for key, cp in checkpoints.items():
+        local_path = S3DownloaderMixin.get_local_path(cp)
+        if not local_path:
+            issues.append(f"No path found for {key}")
+            continue
+
+        local_path_obj = Path(local_path)
+        manifest_path = local_path_obj / "manifest.json"
+        
+        is_corrupt = False
+        reason = ""
+        
+        if not local_path_obj.exists() or not manifest_path.exists():
+            is_corrupt = True
+            reason = "Missing manifest or directory"
+        else:
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+                for file in manifest.get("files", []):
+                    f_path = local_path_obj / file
+                    if not f_path.exists():
+                        is_corrupt = True
+                        reason = f"Missing file: {file}"
+                        break
+                    if f_path.stat().st_size == 0:
+                        is_corrupt = True
+                        reason = f"Empty file: {file}"
+                        break
+            except Exception as e:
+                is_corrupt = True
+                reason = f"Corrupt manifest: {str(e)}"
+
+        if is_corrupt:
+            issues.append(f"{key} is corrupt/missing: {reason}")
+            if manifest_path.exists():
+                try:
+                    manifest_path.unlink()
+                except Exception:
+                    pass
+            if local_path_obj.exists():
+                try:
+                    shutil.rmtree(local_path_obj, ignore_errors=True)
+                except Exception:
+                    pass
+            healed_count += 1
+
+    # Reset tracker status to trigger fresh download/load
+    tracker.reset()
+
+    # Restart background loading/downloading
+    trigger_retry()
+
+    return {
+        "success": True,
+        "healed_count": healed_count,
+        "issues": issues,
+        "message": f"Self-healing complete. Healed {healed_count} model(s)."
+    }
+
+
+async def reset_models_and_data(delete_user_data: bool = False, db_session: Optional[AsyncSession] = None) -> Dict[str, Any]:
+    """Delete all downloaded models on disk, and optionally reset settings/history."""
+    try:
+        from surya.common.s3 import S3DownloaderMixin
+        from surya.settings import settings as surya_settings
+        import shutil
+        import gc
+        from sqlalchemy.ext.asyncio import AsyncSession
+    except ImportError:
+        return {"success": False, "message": "Surya package not installed"}
+
+    checkpoints = [
+        surya_settings.LAYOUT_MODEL_CHECKPOINT,
+        surya_settings.RECOGNITION_MODEL_CHECKPOINT,
+        surya_settings.TABLE_REC_MODEL_CHECKPOINT,
+        surya_settings.DETECTOR_MODEL_CHECKPOINT,
+        surya_settings.OCR_ERROR_MODEL_CHECKPOINT,
+    ]
+
+    # Clear in-memory model cache
+    try:
+        from app.main import _app_state
+        with _app_state.marker_service._lock:
+            _app_state.marker_service._model_dict = None
+            _app_state.marker_service._initialized = False
+    except Exception:
+        pass
+
+    # Run garbage collection and free PyTorch cache to unlock files
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+    deleted_paths = []
+    # 1. Delete model directories
+    for cp in checkpoints:
+        local_path = S3DownloaderMixin.get_local_path(cp)
+        if local_path:
+            local_path_obj = Path(local_path)
+            if local_path_obj.exists():
+                # Unlink manifest first (less likely to be locked) to mark it as uninstalled/not present
+                manifest_path = local_path_obj / "manifest.json"
+                if manifest_path.exists():
+                    try:
+                        manifest_path.unlink()
+                    except Exception as e:
+                        logger.error(f"Failed to delete manifest for {cp}: {e}")
+                
+                try:
+                    shutil.rmtree(local_path_obj, ignore_errors=True)
+                    deleted_paths.append(str(local_path_obj))
+                except Exception as e:
+                    logger.warning(f"Failed to delete model path {local_path}: {e}")
+
+    # Reset tracker status
+    tracker.reset()
+
+    db_reset = False
+    if delete_user_data:
+        try:
+            from app.database import engine, Base
+            from app.core.config import UPLOAD_DIR, OUTPUT_DIR
+            from app.core.api_manager import load_secrets_from_db
+            from app.routes.settings import init_llm_providers_if_missing
+            from app.database import async_session_factory
+            from sqlalchemy.ext.asyncio import async_sessionmaker
+            
+            # Clear uploaded & output files
+            if UPLOAD_DIR.exists():
+                for item in UPLOAD_DIR.iterdir():
+                    try:
+                        if item.is_file():
+                            item.unlink()
+                        elif item.is_dir():
+                            shutil.rmtree(item, ignore_errors=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete upload item {item}: {e}")
+            if OUTPUT_DIR.exists():
+                for item in OUTPUT_DIR.iterdir():
+                    try:
+                        if item.is_file():
+                            item.unlink()
+                        elif item.is_dir():
+                            shutil.rmtree(item, ignore_errors=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete output item {item}: {e}")
+
+            # Re-create DB tables asynchronously
+            bind_engine = db_session.bind if db_session is not None else engine
+            async with bind_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
+                
+            # Initialize default settings and providers
+            if db_session is not None:
+                local_session_factory = async_sessionmaker(bind_engine, class_=AsyncSession, expire_on_commit=False)
+            else:
+                local_session_factory = async_session_factory
+
+            async with local_session_factory() as session:
+                await init_llm_providers_if_missing(session)
+            await load_secrets_from_db()
+            
+            db_reset = True
+        except Exception as e:
+            logger.error(f"Error resetting database: {e}", exc_info=True)
+            db_reset = False
+
+    return {
+        "success": True,
+        "deleted_models": deleted_paths,
+        "user_data_reset": db_reset,
+        "message": "System reset completed successfully."
+    }

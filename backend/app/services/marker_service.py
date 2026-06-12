@@ -162,6 +162,9 @@ class MarkerService:
                 first_wait = False
             time.sleep(5)
 
+        if not self._initialized:
+            logger.info("Marker engine is starting up. Awaiting initialization...")
+
         with self._lock:
             if self._initialized:
                 return

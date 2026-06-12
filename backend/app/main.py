@@ -35,7 +35,7 @@ _app_state = _AppState()
 
 def _load_models_background() -> None:
     import threading
-    from app.services.model_tracker import tracker, check_models_downloaded
+    from app.services.model_tracker import tracker
 
     # If already initialized, do nothing
     if tracker.get_status_dict()["initialized"]:
@@ -44,13 +44,17 @@ def _load_models_background() -> None:
     # Reset tracker state for a fresh session
     tracker.reset()
 
-    # If already downloaded, set to loading state
-    if check_models_downloaded():
-        tracker.set_loading(True)
-
     def _worker() -> None:
+        from app.services.model_tracker import check_models_downloaded, setup_monkeypatch
         t0 = time.perf_counter()
         try:
+            # Apply download tracker monkeypatching in the background thread
+            setup_monkeypatch()
+
+            # If already downloaded, set to loading state
+            if check_models_downloaded():
+                tracker.set_loading(True)
+
             _app_state.marker_service.initialize()
             logger.info(
                 "MarkerService initialised in %.1f s", time.perf_counter() - t0
@@ -130,9 +134,8 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         except Exception as e:
             logger.error("Failed to auto-trigger GPU installation: %s", e)
 
-    # Apply download tracker monkeypatching
-    from app.services.model_tracker import setup_monkeypatch, register_retry_callback
-    setup_monkeypatch()
+    # Register download tracker retry callback
+    from app.services.model_tracker import register_retry_callback
     register_retry_callback(_load_models_background)
 
     _load_models_background()

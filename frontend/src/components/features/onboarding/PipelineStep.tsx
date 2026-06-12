@@ -59,20 +59,20 @@ export function PipelineStep({
   }
 
   return (
-    <div className="flex gap-4 relative group">
+    <div className="flex gap-5 relative group">
       {/* Node indicator */}
-      <div className="flex flex-col items-center shrink-0 relative w-9">
+      <div className="flex flex-col items-center shrink-0 relative w-11">
         {/* Step-specific vertical line segment */}
         {!isLast && (
           <div
-            className={`absolute top-9 bottom-0 w-[1px] left-1/2 -translate-x-1/2 rounded-full transition-all duration-500 ${lineStyles} ${
+            className={`absolute top-11 bottom-0 w-[1.5px] left-1/2 -translate-x-1/2 rounded-full transition-all duration-500 ${lineStyles} ${
               isLineAnimated ? 'animate-pulse duration-[1500ms]' : ''
             }`}
           />
         )}
 
         <div
-          className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-500 relative z-10 ${
+          className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-500 relative z-10 ${
             isCompleted
               ? 'bg-primary border-primary text-primary-foreground'
               : isDownloading
@@ -83,22 +83,22 @@ export function PipelineStep({
           }`}
         >
           {isCompleted ? (
-            <CheckCircle2 className="w-4 h-4" />
+            <CheckCircle2 className="w-5 h-5" />
           ) : isDownloading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
           ) : isFailed ? (
-            <AlertTriangle className="w-4 h-4" />
+            <AlertTriangle className="w-5 h-5" />
           ) : (
-            <span className="text-[10px] font-bold font-mono">{stepNumber}</span>
+            <span className="text-xs font-bold font-mono">{stepNumber}</span>
           )}
         </div>
       </div>
 
       {/* Details Area */}
-      <div className="flex-1 pb-8 space-y-1.5">
-        <div className="flex flex-wrap items-baseline gap-2">
+      <div className="flex-1 pb-10 space-y-2">
+        <div className="flex flex-wrap items-baseline gap-2.5">
           <h4
-            className={`text-xs font-bold tracking-tight transition-colors duration-300 ${
+            className={`text-sm md:text-base font-bold tracking-tight transition-colors duration-300 ${
               isCompleted
                 ? 'text-foreground'
                 : isDownloading
@@ -110,19 +110,19 @@ export function PipelineStep({
           >
             {title}
           </h4>
-          <span className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-widest">
+          <span className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-widest font-bold">
             {status}
           </span>
         </div>
 
-        <p className="text-[10px] text-muted-foreground/60 leading-relaxed max-w-xl font-medium">
+        <p className="text-xs md:text-sm text-muted-foreground/65 leading-relaxed max-w-xl font-medium">
           {description}
         </p>
 
         {/* Dynamic Download metrics & progress bar */}
         {(isDownloading || (progress > 0 && !isCompleted)) && (
-          <div className="space-y-1 pt-1 animate-fade-in max-w-xs">
-            <div className="flex items-center justify-between text-[9px] font-mono text-muted-foreground/60">
+          <div className="space-y-1.5 pt-1 animate-fade-in max-w-sm">
+            <div className="flex items-center justify-between text-xs font-mono text-muted-foreground/60">
               <span className="font-bold text-foreground/80">{progress}%</span>
               {totalBytes > 0 && (
                 <span>
@@ -133,7 +133,7 @@ export function PipelineStep({
             <div className="relative">
               <Progress
                 value={progress}
-                className="h-0.5 bg-secondary rounded-full"
+                className="h-1 bg-secondary rounded-full"
                 indicatorClassName="bg-primary"
               />
             </div>

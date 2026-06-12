@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Save,
   TestTube,
@@ -24,28 +24,17 @@ import {
   ListPlus,
   Activity,
   Trash,
+  Wrench,
+  RotateCcw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
-import {
-  getSettings,
-  getGPUStatus,
-  installGPU,
-  toggleGPU,
-  getLLMProviders,
-  saveLLMProviders,
-  getActiveLLM,
-  setActiveLLM,
-  fetchAvailableModels,
-  type LLMProvider,
-  type ModelConfig,
-  type ActiveLLM,
-  type GPUStatus,
-} from '@/lib/api'
+import { getSettings, getGPUStatus, installGPU, toggleGPU, getLLMProviders, saveLLMProviders, getActiveLLM, setActiveLLM, fetchAvailableModels, selfHealModels, resetModels, type LLMProvider, type ModelConfig, type ActiveLLM, type GPUStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // Helper to map provider types to icons
 function ProviderIcon({ type, className }: { type: string; className?: string }) {
@@ -94,6 +83,87 @@ export function SettingsPage() {
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [customModelId, setCustomModelId] = useState('')
   const [expandedModelSettings, setExpandedModelSettings] = useState<string | null>(null)
+
+  // System maintenance states
+  const [isSelfHealing, setIsSelfHealing] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
+  const [deleteUserDataCheck, setDeleteUserDataCheck] = useState(false)
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false)
+  const [clickCoords, setClickCoords] = useState({ x: 0, y: 0 })
+  const [transitionEnabled, setTransitionEnabled] = useState(false)
+  const resetCardRef = useRef<HTMLDivElement>(null)
+
+  const handleSelfHeal = async () => {
+    setIsSelfHealing(true)
+    toast.info('Verifying engine component files...')
+    try {
+      const res = await selfHealModels()
+      if (res.success) {
+        if (res.healed_count > 0) {
+          toast.success(`Self-healing completed. Re-downloading ${res.healed_count} missing component(s).`)
+          // Redirect the user to Onboarding Page by reloading the page
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        } else {
+          toast.success('Integrity check passed! All components are healthy.')
+        }
+      } else {
+        toast.error(res.message || 'Self-healing failed')
+      }
+    } catch (err) {
+      toast.error('Failed to run self-healing')
+      console.error(err)
+    } finally {
+      setIsSelfHealing(false)
+    }
+  }
+
+  const triggerResetConfirm = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!resetCardRef.current) return
+    const rect = resetCardRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    setTransitionEnabled(false)
+    setClickCoords({ x, y })
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTransitionEnabled(true)
+        setIsConfirmingReset(true)
+      })
+    })
+  }
+
+  const handleGoBack = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!resetCardRef.current) return
+    const rect = resetCardRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    setTransitionEnabled(true)
+    setClickCoords({ x, y })
+    setIsConfirmingReset(false)
+  }
+
+  const handleReset = async () => {
+    setIsResetting(true)
+    toast.info('Cleaning environment...')
+    try {
+      const res = await resetModels(deleteUserDataCheck)
+      if (res.success) {
+        toast.success(res.message || 'System reset completed.')
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      } else {
+        toast.error(res.message || 'System reset failed.')
+      }
+    } catch (err) {
+      toast.error('Failed to reset system')
+      console.error(err)
+    } finally {
+      setIsResetting(false)
+    }
+  }
 
   // Fetch initial data
   useEffect(() => {
@@ -391,15 +461,11 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6 relative">
-      {/* Header */}
-      <div className="border-b border-border/20 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">Settings</h2>
-          <p className="text-xs md:text-sm text-muted-foreground mt-1.5 leading-relaxed">
-            Configure language model backends, API credentials, and parameter thresholds.
-          </p>
-        </div>
+    <div className="flex flex-col min-h-full">
+      <PageHeader 
+        title="Settings"
+        description="Configure language model backends, API credentials, and parameter thresholds."
+      >
         <Button
           onClick={() => setShowAddCustomModal(true)}
           className="shadow-sm rounded-lg hover:scale-[1.005] active:scale-[0.99] transition-all text-xs font-bold uppercase tracking-wider h-10 w-fit shrink-0 gap-1.5"
@@ -407,9 +473,10 @@ export function SettingsPage() {
           <ListPlus className="w-4 h-4" />
           Add Custom OpenAI Provider
         </Button>
-      </div>
+      </PageHeader>
 
-      {/* Global LLM active banner */}
+      <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6 w-full relative">
+        {/* Global LLM active banner */}
       <div className="glass-card border border-border/30 rounded-2xl p-5 shadow-sm space-y-4 bg-card/15">
         <div className="flex items-center gap-2 border-b border-border/20 pb-3">
           <Activity className="w-4.5 h-4.5 text-primary" />
@@ -681,6 +748,157 @@ export function SettingsPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* System Maintenance Section */}
+      <div className="space-y-4 pt-6 border-t border-border/20">
+        <div className="space-y-1 text-left">
+          <h3 className="text-xs font-bold tracking-widest text-muted-foreground/80 uppercase flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-primary" />
+            System Maintenance
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
+            Verify engine files, self-heal missing model components, or reset the local environment to a clean state.
+          </p>
+        </div>
+
+        {/* Maintenance Actions Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+          {/* Card 1: Self-Healing */}
+          <div className="border border-border/60 rounded-xl p-5 flex flex-col justify-between transition-all bg-card/25 shadow-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-muted border border-border/40 text-muted-foreground">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <h4 className="font-extrabold text-sm text-foreground">Self-Healing & Verification</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Thoroughly inspect all downloaded model files and components. If any parts are corrupted or missing, the system will automatically download them to restore functionality.
+              </p>
+            </div>
+            <div className="mt-5 pt-3 border-t border-border/10">
+              <Button
+                variant="outline"
+                disabled={isSelfHealing || isResetting}
+                onClick={handleSelfHeal}
+                className="w-full text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg border-border/50 hover:bg-muted/40 gap-1.5"
+              >
+                {isSelfHealing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 text-primary" />
+                    Healing...
+                  </>
+                ) : (
+                  <>
+                    <Wrench className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+                    Verify & Self-Heal
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Card 2: Reset */}
+          <div 
+            ref={resetCardRef}
+            className="relative overflow-hidden border border-border/60 rounded-xl p-5 flex flex-col justify-between transition-all bg-card/25 shadow-sm min-h-[190px]"
+          >
+            {/* Standard Mode Card Content */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-muted border border-border/40 text-muted-foreground">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <h4 className="font-extrabold text-sm text-foreground">Reset Local Environment</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Delete downloaded model weights to clean up storage and restart the engine onboarding. Your API keys, LLM providers, and job history are preserved by default.
+              </p>
+
+              {/* Advanced option checkbox - highly visible */}
+              <div className="flex items-center gap-3 pt-2 select-none">
+                <input
+                  type="checkbox"
+                  id="delete-user-data-checkbox"
+                  checked={deleteUserDataCheck}
+                  onChange={(e) => setDeleteUserDataCheck(e.target.checked)}
+                  className="rounded border-2 border-border/80 bg-secondary/80 text-primary focus:ring-primary focus:ring-offset-background h-4.5 w-4.5 cursor-pointer transition-all hover:border-primary"
+                />
+                <label
+                  htmlFor="delete-user-data-checkbox"
+                  className="text-xs font-bold text-foreground/95 uppercase tracking-wider cursor-pointer select-none"
+                >
+                  Also delete user data (history, settings, credentials)
+                </label>
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-border/10">
+              <Button
+                variant="outline"
+                disabled={isSelfHealing || isResetting}
+                onClick={triggerResetConfirm}
+                className="w-full text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg border-rose-500/30 hover:border-rose-500 hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1 text-muted-foreground hover:text-rose-500" />
+                Reset Environment
+              </Button>
+            </div>
+
+            {/* Red Reveal Danger Overlay */}
+            <div
+              className={cn(
+                "absolute inset-0 bg-gradient-to-br from-red-950 to-rose-900 border border-red-500/40 rounded-xl z-10 flex flex-col justify-between p-5",
+                transitionEnabled ? "transition-all duration-400 ease-out" : "transition-none"
+              )}
+              style={{
+                clipPath: isConfirmingReset
+                  ? `circle(150% at ${clickCoords.x}px ${clickCoords.y}px)`
+                  : `circle(0% at ${clickCoords.x}px ${clickCoords.y}px)`,
+                pointerEvents: isConfirmingReset ? 'auto' : 'none',
+              }}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-red-900/60 border border-red-500/30 text-white">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                  </div>
+                  <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">Confirm System Reset</h4>
+                </div>
+                <p className="text-xs text-red-200/95 leading-relaxed font-semibold">
+                  {deleteUserDataCheck
+                    ? 'DANGER: You are about to permanently delete all downloaded models AND ALL user database tables, LLM settings, API keys, and job history. This cannot be undone!'
+                    : 'You are about to delete all downloaded model weights from local storage. Your settings, API keys, and history will be preserved.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-red-500/20">
+                <Button
+                  variant="ghost"
+                  onClick={handleGoBack}
+                  className="flex-1 text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg text-red-200 hover:text-white hover:bg-white/10"
+                >
+                  Go Back
+                </Button>
+                <Button
+                  disabled={isResetting}
+                  onClick={handleReset}
+                  className="flex-1 text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg bg-white text-red-700 hover:bg-red-50 transition-colors shadow-md border-0"
+                >
+                  {isResetting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 text-red-700" />
+                      Resetting...
+                    </>
+                  ) : (
+                    'Confirm Reset'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Slide-over Drawer for API Keys & Credentials */}
@@ -1237,5 +1455,6 @@ export function SettingsPage() {
         </div>
       )}
     </div>
+  </div>
   )
 }

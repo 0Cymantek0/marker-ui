@@ -66,16 +66,16 @@ export function EngineConsole({
   return (
     <div className="space-y-8 select-none">
       {/* Title Header */}
-      <div className="space-y-3 pb-6 border-b border-border/40">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-secondary rounded-xl">
-            <Database className="h-5 w-5 text-foreground/80" />
+      <div className="space-y-4 pb-6 border-b border-border/40">
+        <div className="flex items-center gap-3.5">
+          <div className="p-2.5 bg-secondary rounded-xl">
+            <Database className="h-6 w-6 text-foreground/80" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
             One-Time Setup
           </h1>
         </div>
-        <p className="text-muted-foreground text-xs md:text-sm leading-relaxed max-w-sm">
+        <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-md">
           Marker requires localized AI models to execute document conversion and layout extraction.
           We are setting up your local environment.
         </p>
@@ -84,33 +84,33 @@ export function EngineConsole({
       {/* Main Status & Large Meter */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-muted-foreground/60">
+          <span className="text-xs uppercase tracking-wider font-extrabold text-muted-foreground/60">
             Overall Setup Progress
           </span>
           <div className="flex items-center gap-2">
             {isCompleted && (
-              <div className="flex items-center gap-1.5 text-foreground/80 font-bold text-xs">
-                <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Ready
+              <div className="flex items-center gap-1.5 text-foreground/80 font-bold text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary" /> Ready
               </div>
             )}
             {isDownloading && (
-              <div className="flex items-center gap-1.5 text-foreground/60 font-bold text-xs">
+              <div className="flex items-center gap-1.5 text-foreground/65 font-bold text-sm">
                 <span className="animate-shimmer text-foreground inline-block">Downloading Assets</span>
               </div>
             )}
             {isLoading && (
-              <div className="flex items-center gap-1.5 text-foreground/60 font-bold text-xs">
+              <div className="flex items-center gap-1.5 text-foreground/65 font-bold text-sm">
                 <span className="animate-shimmer text-foreground inline-block">Initializing Engine</span>
               </div>
             )}
             {isFailed && (
-              <div className="flex items-center gap-1.5 text-destructive font-bold text-xs uppercase tracking-tight">
-                <XCircle className="h-3.5 w-3.5" /> Interrupted
+              <div className="flex items-center gap-1.5 text-destructive font-bold text-sm uppercase tracking-tight">
+                <XCircle className="h-4 w-4" /> Interrupted
               </div>
             )}
             {isPending && (
-              <div className="flex items-center gap-1.5 text-muted-foreground font-bold text-xs uppercase tracking-tight">
-                <Download className="h-3.5 w-3.5" /> Waiting
+              <div className="flex items-center gap-1.5 text-muted-foreground font-bold text-sm uppercase tracking-tight">
+                <Download className="h-4 w-4" /> Waiting
               </div>
             )}
           </div>
@@ -118,26 +118,26 @@ export function EngineConsole({
 
         {/* Big visual number and speed/ETA statistics HUD */}
         <div className="flex items-baseline justify-between gap-4">
-          <div className="flex items-baseline gap-2">
-            <span className="text-6xl font-black tracking-tighter font-mono text-foreground">
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-7xl md:text-8xl font-black tracking-tighter font-mono text-foreground">
               {overall.progress}%
             </span>
             {isDownloading && (
-              <span className="text-[10px] text-muted-foreground/60 font-mono">
+              <span className="text-xs text-muted-foreground/60 font-mono">
                 {formatBytes(overall.downloaded_bytes)} / {formatBytes(overall.total_bytes)}
               </span>
             )}
           </div>
 
           {isDownloading && (
-            <div className="flex items-center gap-3 bg-secondary/50 border border-border/40 rounded-lg px-2.5 py-1.5 font-mono text-[10px] leading-tight">
+            <div className="flex items-center gap-4 bg-secondary/50 border border-border/40 rounded-lg px-3.5 py-2 font-mono text-xs leading-tight">
               <div>
-                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[8px]">Speed</span>
+                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[10px]">Speed</span>
                 <span className="text-foreground/80 font-bold">{overall.speed.toFixed(1)} MB/s</span>
               </div>
-              <div className="w-px h-4 bg-border/40" />
+              <div className="w-px h-5 bg-border/40" />
               <div>
-                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[8px]">Time</span>
+                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[10px]">Time</span>
                 <span className="text-foreground/80 font-bold">{formatETA(overall.eta)}</span>
               </div>
             </div>
@@ -148,7 +148,7 @@ export function EngineConsole({
         <div className="relative pt-1 select-none">
           <Progress
             value={overall.progress}
-            className="h-1 bg-secondary rounded-full"
+            className="h-2 bg-secondary rounded-full"
             indicatorClassName={indicatorColor}
           />
         </div>

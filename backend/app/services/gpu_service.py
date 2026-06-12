@@ -22,8 +22,8 @@ class GPUService:
         self._error_message: Optional[str] = None
         self._thread: Optional[threading.Thread] = None
 
-        # Check if already installed on startup
-        self.verify_installation_sync()
+        # Check if already installed on startup in a separate thread to not block the main thread
+        threading.Thread(target=self.verify_installation_sync, daemon=True).start()
 
     @property
     def status_dict(self) -> Dict[str, Any]:

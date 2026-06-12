@@ -15,6 +15,8 @@ vi.mock('@/lib/api', () => ({
   getActiveLLM: vi.fn(),
   setActiveLLM: vi.fn(),
   fetchAvailableModels: vi.fn(),
+  selfHealModels: vi.fn(),
+  resetModels: vi.fn(),
 }))
 
 vi.mock('sonner', () => ({
@@ -168,5 +170,24 @@ describe('SettingsPage component', () => {
     const savedArg = vi.mocked(api.saveLLMProviders).mock.calls[0][0]
     const geminiSaved = savedArg.find(p => p.id === 'gemini')
     expect(geminiSaved?.models).toContainEqual({ model_id: 'gemini-3-flash-preview' })
+  })
+
+  it('opens and closes the reset confirmation overlay', async () => {
+    render(<SettingsPage />)
+    await screen.findByText('Configured Service Providers')
+
+    const resetBtn = screen.getByRole('button', { name: 'Reset Environment' })
+    await act(async () => {
+      fireEvent.click(resetBtn)
+    })
+
+    expect(screen.getByText('Confirm System Reset')).toBeInTheDocument()
+
+    const goBackBtn = screen.getByRole('button', { name: 'Go Back' })
+    await act(async () => {
+      fireEvent.click(goBackBtn)
+    })
+
+    expect(api.resetModels).not.toHaveBeenCalled()
   })
 })

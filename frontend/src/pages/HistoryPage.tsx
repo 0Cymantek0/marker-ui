@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { getHistory, deleteJob, downloadResult, getJobStatus, type JobStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const STATUS_VARIANT = {
   pending: 'secondary' as const,
@@ -191,22 +192,19 @@ export function HistoryPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/20 pb-5">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">Conversion History</h2>
-          <p className="text-xs md:text-sm text-muted-foreground mt-1.5 leading-relaxed">
-            Browse, preview, and download previous document conversions.
-          </p>
-        </div>
+    <div className="flex flex-col min-h-full">
+      <PageHeader 
+        title="Conversion History"
+        description="Browse, preview, and download previous document conversions."
+      >
         <Button variant="outline" size="sm" onClick={() => void fetchJobs()} className="rounded-lg hover:bg-muted/50">
           <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
           Refresh
         </Button>
-      </div>
+      </PageHeader>
 
-      {/* Stats Dashboard Grid */}
+      <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6 w-full">
+        {/* Stats Dashboard Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="glass-card p-5 flex items-center justify-between border border-border/30 shadow-sm">
           <div>
@@ -489,5 +487,6 @@ export function HistoryPage() {
         </div>
       )}
     </div>
+  </div>
   )
 }

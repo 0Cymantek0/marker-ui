@@ -17,7 +17,7 @@ export default function App() {
       try {
         const data = await getModelsStatus()
         if (active) {
-          if (data.initialized || data.overall.status === 'completed') {
+          if (data.initialized || data.overall.status === 'completed' || data.overall.status === 'loading') {
             setInitialized(true)
           } else {
             setInitialized(false)

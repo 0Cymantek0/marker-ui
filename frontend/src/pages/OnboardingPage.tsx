@@ -113,7 +113,7 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] -z-10 animate-pulse duration-[8000ms]" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-muted/10 rounded-full blur-[100px] -z-10 animate-pulse duration-[6000ms]" />
 
-      <div className="w-full max-w-6xl space-y-8 relative py-6 md:py-10 px-4 md:px-6">
+      <div className="w-full max-w-7xl 2xl:max-w-8xl space-y-8 relative py-6 md:py-10 px-4 md:px-6">
         {/* Failed / Interrupt Alert banner */}
         {isFailed && (
           <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3 text-rose-400 animate-fade-in select-none">
@@ -128,7 +128,7 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
         )}
 
         {/* Responsive Dual-Panel grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 xl:gap-24 items-start">
           {/* Left Column (Console / Control) */}
           <div className="lg:col-span-5 space-y-8">
             <EngineConsole

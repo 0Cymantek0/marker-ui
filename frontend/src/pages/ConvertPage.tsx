@@ -9,6 +9,7 @@ import { TerminalLog } from '@/components/features/TerminalLog'
 import { useConversionQueue } from '@/hooks/useConversionQueue'
 import type { ConversionConfig } from '@/lib/api'
 import { Progress } from '@/components/ui/progress'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const DEFAULT_CONFIG: ConversionConfig = {
   output_format: 'markdown',
@@ -81,18 +82,14 @@ export function ConvertPage() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6">
-      {/* Page Header */}
-      <div className="border-b border-border/20 pb-5">
-        <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-          Convert Document
-        </h2>
-        <p className="text-xs md:text-sm text-muted-foreground mt-1.5 max-w-3xl leading-relaxed">
-          Transform PDFs, Word documents, spreadsheets, slides, and images into clean, layout-aware, production-ready Markdown files.
-        </p>
-      </div>
+    <div className="flex flex-col min-h-full">
+      <PageHeader 
+        title="Convert Document"
+        description="Transform PDFs, Word documents, spreadsheets, slides, and images into clean, layout-aware, production-ready Markdown files."
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-12 items-start">
+      <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-12 items-start">
         {/* Left Column: File Upload Zone & Config Options (5 cols) */}
         <div className="lg:col-span-5 space-y-8">
           {/* Step 1: Upload */}
@@ -331,6 +328,7 @@ export function ConvertPage() {
         </div>
       </div>
     </div>
+  </div>
   )
 }
 

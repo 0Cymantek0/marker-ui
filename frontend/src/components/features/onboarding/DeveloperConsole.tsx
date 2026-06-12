@@ -32,24 +32,24 @@ export function DeveloperConsole({ status }: DeveloperConsoleProps) {
     )
 
   return (
-    <div className="w-full bg-secondary/30 border border-border/40 rounded-xl overflow-hidden font-mono text-[10px]">
+    <div className="w-full bg-secondary/30 border border-border/40 rounded-xl overflow-hidden font-mono text-xs md:text-sm">
       {/* Terminal Header Bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 border-b border-border/40 select-none">
+      <div className="flex items-center justify-between px-4 py-3 bg-secondary/50 border-b border-border/40 select-none">
         <div className="flex items-center gap-1.5">
           {/* Mock Window Dots */}
           <div className="w-2.5 h-2.5 rounded-full bg-border/40" />
           <div className="w-2.5 h-2.5 rounded-full bg-border/40" />
           <div className="w-2.5 h-2.5 rounded-full bg-border/40" />
         </div>
-        <span className="text-[9px] text-muted-foreground/60 font-bold uppercase tracking-widest flex items-center gap-1.5">
-          <Terminal className="w-3 h-3 text-muted-foreground/40" />
+        <span className="text-[11px] text-muted-foreground/65 font-bold uppercase tracking-widest flex items-center gap-2">
+          <Terminal className="w-3.5 h-3.5 text-muted-foreground/40" />
           engine-diagnostics.sh
         </span>
         <div className="w-12" /> {/* spacer for center alignment */}
       </div>
 
       {/* Terminal Content Screen */}
-      <div className="p-4 space-y-2.5 min-h-[140px] max-h-[180px] overflow-y-auto text-foreground/70">
+      <div className="p-5 space-y-3 min-h-[180px] max-h-[240px] overflow-y-auto text-foreground/75">
         <div className="flex items-center gap-2 text-muted-foreground/40">
           <span>$</span>
           <span>./marker-engine --init --verbose</span>
@@ -76,7 +76,7 @@ export function DeveloperConsole({ status }: DeveloperConsoleProps) {
                 <span className="truncate max-w-[55%] font-mono opacity-80">
                   &gt; {file.filename}
                 </span>
-                <span className="shrink-0 text-foreground font-mono text-[9px] bg-secondary/60 border border-border/40 px-1.5 py-0.5 rounded">
+                <span className="shrink-0 text-foreground font-mono text-[10px] bg-secondary/60 border border-border/40 px-2 py-0.5 rounded">
                   {formatBytes(file.downloaded)}
                   {file.total > 0 && ` / ${formatBytes(file.total)}`}
                 </span>

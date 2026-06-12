@@ -36,7 +36,7 @@ function AppContent({
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0">
-        <main className="flex-1 overflow-auto p-6 bg-background/50 dark:bg-background/20">
+        <main className="flex-1 overflow-auto bg-background/50 dark:bg-background/20">
           <Outlet />
         </main>
       </div>

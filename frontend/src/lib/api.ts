@@ -441,3 +441,11 @@ export async function toggleGPU(enabled: boolean): Promise<{ status: string; ena
   })
 }
 
+export async function selfHealModels(): Promise<{ success: boolean; healed_count: number; issues: string[]; message: string }> {
+  return request<{ success: boolean; healed_count: number; issues: string[]; message: string }>('/models/self-heal', { method: 'POST' })
+}
+
+export async function resetModels(deleteUserData: boolean): Promise<{ success: boolean; deleted_models: string[]; user_data_reset: boolean; message: string }> {
+  return request<{ success: boolean; deleted_models: string[]; user_data_reset: boolean; message: string }>(`/models/reset?delete_user_data=${deleteUserData}`, { method: 'POST' })
+}
+
