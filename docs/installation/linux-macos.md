@@ -4,9 +4,9 @@ This guide covers setting up and running Marker UI on Linux and macOS environmen
 
 ---
 
-## One-Click Launcher
+## One-Click Launcher (Recommended)
 
-Marker UI provides a shell launcher script (`start.sh`) that automatically cleans up ports, validates Python and Node.js environments, installs dependencies, and boots the backend and frontend.
+Using the quick-start launcher script is the recommended method to run Marker UI. Marker UI provides a shell launcher script (`start.sh`) that automatically cleans up ports, validates Python and Node.js environments, installs dependencies, and boots the backend and frontend.
 
 ### Quick Start
 1. Ensure the script is executable:

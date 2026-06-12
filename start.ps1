@@ -113,21 +113,40 @@ Write-Host "  Virtual environment ready" -ForegroundColor Green
 # ── Install Python deps ──────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "[3/6] Installing Python dependencies (first run may take a while)..." -ForegroundColor Yellow
+Write-Host "[3/6] Installing Python dependencies..." -ForegroundColor Yellow
 
-& $venvPip install -r backend/requirements.txt --quiet 2>&1 | ForEach-Object {
-    if ($_ -match "error|ERROR|fail") { Write-Host "  $_" -ForegroundColor Red }
-}
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  WARNING: Some dependencies may have failed. Retrying without [full] extra..." -ForegroundColor DarkYellow
-    # Retry without the [full] extra - core PDF support still works
-    $filteredReqs = Get-Content backend/requirements.txt | Where-Object {
-        $_ -notmatch "marker-pdf\[full\]"
+$installedFlag = Join-Path ".venv" "installed"
+if (-not (Test-Path $installedFlag)) {
+    Write-Host "  Installing dependencies (first run may take a while)..." -ForegroundColor DarkGray
+    & $venvPip install -r backend/requirements.txt --quiet
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  WARNING: Full install failed, retrying without [full] extra..." -ForegroundColor DarkYellow
+        
+        $tempReqs = Join-Path "backend" "requirements_min.txt"
+        Get-Content backend/requirements.txt | Where-Object {
+            $_ -notmatch "marker-pdf\[full\]"
+        } | Set-Content $tempReqs
+        
+        & $venvPip install -r $tempReqs --quiet
+        $minInstallStatus = $LASTEXITCODE
+        
+        if (Test-Path $tempReqs) { Remove-Item $tempReqs -Force }
+        
+        if ($minInstallStatus -eq 0) {
+            & $venvPip install marker-pdf --quiet
+        }
     }
-    $filteredReqs | & $venvPip install -r - --quiet 2>$null
-    & $venvPip install marker-pdf --quiet 2>$null
+    
+    if ($LASTEXITCODE -eq 0) {
+        New-Item -ItemType File -Path $installedFlag -Force | Out-Null
+        Write-Host "  Python dependencies installed" -ForegroundColor Green
+    } else {
+        Write-Host "  ERROR: Python dependency installation failed." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "  Python dependencies already installed, skipping check." -ForegroundColor DarkGray
 }
-Write-Host "  Python dependencies installed" -ForegroundColor Green
 
 # ── Install Node deps ────────────────────────────────────────────────
 

@@ -4,9 +4,9 @@ This guide covers setting up and running Marker UI on Windows machines.
 
 ---
 
-## One-Click Launcher
+## One-Click Launcher (Recommended)
 
-Marker UI provides a PowerShell/Batch launcher that automatically checks prerequisites, creates a virtual environment, installs dependencies, and runs both backend and frontend.
+Using the quick-start launcher scripts is the recommended method to run Marker UI. Marker UI provides a PowerShell/Batch launcher that automatically checks prerequisites, creates a virtual environment, installs dependencies, and runs both backend and frontend.
 
 ### Running with start.bat
 1. Double-click `start.bat` in the root folder (or run `.\start.bat` in Command Prompt).

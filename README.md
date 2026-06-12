@@ -71,15 +71,42 @@ We have structured the documentation to help you get started quickly or dive dee
 
 ---
 
-## Quick Start (Docker)
+## Quick Start
 
-Spin up the entire stack with:
+The recommended method to run Marker UI is using the quick-start launcher scripts (`start.sh` / `start.bat` / `start.ps1`) depending on your platform. These scripts automatically handle system checks, environment creation, dependencies, and launch both frontend and backend.
+
+### 1. Launcher Scripts (Recommended)
+
+- **Linux & macOS**:
+  ```bash
+  chmod +x start.sh
+  ./start.sh
+  ```
+- **Windows (Command Prompt / Explorer)**:
+  Double-click `start.bat` or run:
+  ```cmd
+  start.bat
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+  .\start.ps1
+  ```
+
+Once started, open `http://localhost:5173` in your browser.
+
+### 2. Docker Compose
+
+Alternatively, spin up the entire stack via Docker:
 
 ```bash
 docker compose up -d
 ```
 
-Open `http://localhost:3000` to begin. The first conversion may take several minutes as the neural models download in the background.
+Once started, open `http://localhost:3000` in your browser.
+
+> [!NOTE]
+> The first conversion may take several minutes as neural models download in the background.
 
 ---
 

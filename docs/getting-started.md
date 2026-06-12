@@ -19,17 +19,18 @@ Marker UI bridges these gaps by wrapping the engine in a modern, secure, and sel
 
 Choose the guide that fits your goals:
 
-### 1. I want to deploy the app quickly
-If you want to use the application without managing Python packages, virtual environments, or Node.js versions, run via **Docker Compose**:
+### 1. I want to run the app quickly (Recommended)
+The recommended way to run Marker UI is using the quick-start launcher scripts (`start.sh` / `start.bat` / `start.ps1`). These scripts automate dependency checks, virtual environment creation, installation, and startup:
+- For Windows: Go to the [Windows Setup Guide](installation/windows.md).
+- For Linux & macOS: Go to the [Linux & macOS Setup Guide](installation/linux-macos.md).
+
+### 2. I want to deploy using Docker
+If you want to run the application containerized without managing Python packages, virtual environments, or Node.js versions on your host system:
 - Go to the [Docker Installation Guide](installation/docker.md).
 
-### 2. I want to build and modify the code
-If you want to run the frontend and backend in development mode to contribute features or troubleshoot code directly:
+### 3. I want to build and modify the code manually
+If you want to manually configure, run, and develop the frontend and backend:
 - Go to the [Source Installation Guide](installation/source.md).
-
-### 3. Operating System Specific Guides
-- [Windows Setup Guide](installation/windows.md)
-- [Linux & macOS Setup Guide](installation/linux-macos.md)
 
 ---
 

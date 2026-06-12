@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# ──────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Marker UI - One-click launcher (Linux / macOS)
 # Usage: chmod +x start.sh && ./start.sh
-# ──────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -24,7 +24,7 @@ ok()    { echo -e "  ${GREEN}$1${NC}"; }
 warn()  { echo -e "  ${YELLOW}$1${NC}"; }
 err()   { echo -e "  ${RED}$1${NC}"; }
 
-# ── Clean up orphaned processes ──────────────────────────────────────
+# â”€â”€ Clean up orphaned processes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo -e "  Checking and cleaning up any orphaned processes on ports 8000 and 5173..."
 for port in 8000 5173; do
     if command -v lsof &>/dev/null; then
@@ -42,15 +42,13 @@ for port in 8000 5173; do
     fi
 done
 
-# ── Prerequisites ────────────────────────────────────────────────────
+# â”€â”€ Prerequisites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo -e "${YELLOW}[1/6] Checking prerequisites...${NC}"
 
 PYTHON=""
 for cmd in python3 python; do
     if command -v "$cmd" &>/dev/null; then
-        ver=$($cmd --version 2>&1 | grep -oP '3\.\d+')
-        minor=$(echo "$ver" | cut -d. -f2)
-        if [ "$minor" -ge 10 ] 2>/dev/null; then
+        if "$cmd" -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" &>/dev/null; then
             PYTHON="$cmd"
             break
         fi
@@ -69,7 +67,7 @@ if ! command -v node &>/dev/null; then
 fi
 ok "Node.js: $(node --version)"
 
-# ── Virtual environment ──────────────────────────────────────────────
+# â”€â”€ Virtual environment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo ""
 echo -e "${YELLOW}[2/6] Setting up Python virtual environment...${NC}"
 
@@ -86,18 +84,30 @@ fi
 source .venv/bin/activate
 ok "Virtual environment ready"
 
-# ── Install Python deps ──────────────────────────────────────────────
+# â”€â”€ Install Python deps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo ""
-echo -e "${YELLOW}[3/6] Installing Python dependencies (first run may take a while)...${NC}"
+echo -e "${YELLOW}[3/6] Installing Python dependencies...${NC}"
 
-pip install -r backend/requirements.txt --quiet 2>&1 | grep -i "error" && {
-    warn "Full install had issues, retrying without [full] extra..."
-    grep -v "marker-pdf\[full\]" backend/requirements.txt | pip install -r /dev/stdin --quiet
-    pip install marker-pdf --quiet
-}
-ok "Python dependencies installed"
+if [ ! -f ".venv/installed" ]; then
+    info "Installing dependencies (first run may take a while)..."
+    if pip install -r backend/requirements.txt --quiet; then
+        touch .venv/installed
+        ok "Python dependencies installed"
+    else
+        warn "Full install had issues, retrying without [full] extra..."
+        if grep -v "marker-pdf\[full\]" backend/requirements.txt | pip install -r /dev/stdin --quiet && pip install marker-pdf --quiet; then
+            touch .venv/installed
+            ok "Python dependencies installed"
+        else
+            err "ERROR: Python dependency installation failed."
+            exit 1
+        fi
+    fi
+else
+    info "Python dependencies already installed, skipping check."
+fi
 
-# ── Install Node deps ────────────────────────────────────────────────
+# â”€â”€ Install Node deps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo ""
 echo -e "${YELLOW}[4/6] Installing Node.js dependencies...${NC}"
 
@@ -115,13 +125,13 @@ fi
 cd ..
 ok "Node.js dependencies installed"
 
-# ── Data dirs ────────────────────────────────────────────────────────
+# â”€â”€ Data dirs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo ""
 echo -e "${YELLOW}[5/6] Creating data directories...${NC}"
 mkdir -p data/uploads data/output
 ok "Data directories ready"
 
-# ── Start services ───────────────────────────────────────────────────
+# â”€â”€ Start services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo ""
 echo -e "${YELLOW}[6/6] Starting services...${NC}"
 echo ""
@@ -129,16 +139,30 @@ echo ""
 cleanup() {
     echo ""
     warn "Stopping services..."
-    [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null
-    [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null
+    [ -n "${BACKEND_PID:-}" ] && kill "${BACKEND_PID}" 2>/dev/null || true
+    [ -n "${FRONTEND_PID:-}" ] && kill "${FRONTEND_PID}" 2>/dev/null || true
     ok "Services stopped."
     exit 0
 }
 trap cleanup SIGINT SIGTERM
 
+port_in_use() {
+    local port=$1
+    if command -v lsof &>/dev/null; then
+        lsof -ti:$port &>/dev/null
+    elif command -v ss &>/dev/null; then
+        ss -tln | grep -E -q ":$port( |$)"
+    elif command -v netstat &>/dev/null; then
+        netstat -tln | grep -E -q ":$port( |$)"
+    else
+        # Fallback to bash built-in /dev/tcp
+        (echo > /dev/tcp/127.0.0.1/$port) &>/dev/null
+    fi
+}
+
 find_free_port() {
     local port=$1
-    while lsof -ti:$port &>/dev/null; do
+    while port_in_use "$port"; do
         port=$((port + 1))
         if [ $port -ge 65535 ]; then
             err "No free port found for backend."
@@ -174,9 +198,9 @@ FRONTEND_PID=$!
 cd ..
 sleep 3
 
-# ── Done ─────────────────────────────────────────────────────────────
+# â”€â”€ Done â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 echo ""
-ok "════════════════════════════════════════════════════"
+ok "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 ok "Marker UI is running!"
 echo ""
 info "  Frontend:  ${CYAN}http://localhost:5173${NC}"
@@ -184,7 +208,7 @@ info "  Backend:   ${CYAN}http://localhost:$BACKEND_PORT${NC}"
 info "  API Docs:  ${CYAN}http://localhost:$BACKEND_PORT/docs${NC}"
 echo ""
 warn "  Press Ctrl+C to stop both services."
-ok "════════════════════════════════════════════════════"
+ok "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
 echo ""
 
 # Wait
