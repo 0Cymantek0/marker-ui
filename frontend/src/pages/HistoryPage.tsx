@@ -45,6 +45,7 @@ function formatDate(dateStr: string): string {
 }
 
 export function HistoryPage() {
+  const PAGE_SIZE = 50
   const [jobs, setJobs] = useState<JobStatus[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -79,7 +80,7 @@ export function HistoryPage() {
   const fetchJobs = useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await getHistory(page, 50) // load a larger page size to support local filtering
+      const data = await getHistory(page, PAGE_SIZE)
       setJobs(data.jobs)
       setTotal(data.total)
     } catch {
@@ -187,7 +188,7 @@ export function HistoryPage() {
     }
   }
 
-  const totalPages = Math.ceil(total / 20)
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-8 pb-12 px-4 md:px-6">

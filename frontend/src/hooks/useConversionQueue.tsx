@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 import {
   uploadFile,
   getJobEvents,
@@ -47,6 +47,7 @@ const ConversionContext = createContext<ConversionContextType | null>(null)
 
 export function ConversionProvider({ children }: { children: React.ReactNode }) {
   const [jobs, setJobs] = useState<JobState[]>([])
+  const eventSourcesRef = useRef<Record<string, EventSource>>({})
 
   const updateJob = useCallback((id: string, updater: Partial<JobState> | ((prev: JobState) => JobState)) => {
     setJobs((prevJobs) =>
@@ -153,8 +154,17 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
             logs: [...prev.logs, '[SYSTEM] Job was cancelled on the backend.'],
           }))
         }
-      } catch {
-        // Network error during polling — keep trying
+      } catch (err: any) {
+        const is404 = err instanceof Error && err.message.includes('404')
+        if (is404) {
+          clearInterval(pollInterval)
+          updateJob(id, (prev) => ({
+            ...prev,
+            phase: 'failed',
+            statusText: 'Cancelled',
+            logs: [...prev.logs, '[SYSTEM] Job not found on backend (deleted/cancelled).'],
+          }))
+        }
       }
     }, 3000)
   }, [updateJob])
@@ -198,20 +208,37 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
       }))
 
       const es = getJobEvents(response.job_id)
+      eventSourcesRef.current[job.id] = es
+
+      const closeES = () => {
+        es.close()
+        delete eventSourcesRef.current[job.id]
+      }
 
       es.addEventListener('progress', (e) => {
         const data = e.data ? JSON.parse(e.data) : {}
         const messageStr = data.message || 'Executing conversion pipelines...'
 
         if (data.status === 'completed') {
-          es.close()
+          closeES()
           handleJobCompleted(job.id, response.job_id)
           return
         }
 
         if (data.status === 'failed') {
-          es.close()
+          closeES()
           handleJobFailed(job.id, data.error ?? 'Conversion failed')
+          return
+        }
+
+        if (data.status === 'cancelled') {
+          closeES()
+          updateJob(job.id, (prev) => ({
+            ...prev,
+            phase: 'failed',
+            statusText: 'Cancelled',
+            logs: [...prev.logs, '[SYSTEM] Job was cancelled.'],
+          }))
           return
         }
 
@@ -240,16 +267,24 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
       es.addEventListener('status', (e) => {
         const data = e.data ? JSON.parse(e.data) : {}
         if (data.status === 'completed') {
-          es.close()
+          closeES()
           handleJobCompleted(job.id, response.job_id)
         } else if (data.status === 'failed') {
-          es.close()
+          closeES()
           handleJobFailed(job.id, data.error ?? 'Conversion failed')
+        } else if (data.status === 'cancelled') {
+          closeES()
+          updateJob(job.id, (prev) => ({
+            ...prev,
+            phase: 'failed',
+            statusText: 'Cancelled',
+            logs: [...prev.logs, '[SYSTEM] Job was cancelled.'],
+          }))
         }
       })
 
       es.onerror = () => {
-        es.close()
+        closeES()
         handleJobSSEDisconnected(job.id, response.job_id)
       }
 
@@ -323,6 +358,12 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
   }, [runJob])
 
   const cancel = useCallback(async (id: string) => {
+    // Immediately close EventSource if active to prevent triggering onerror and polling
+    if (eventSourcesRef.current[id]) {
+      eventSourcesRef.current[id].close()
+      delete eventSourcesRef.current[id]
+    }
+
     setJobs((prevJobs) => {
       const job = prevJobs.find((j) => j.id === id)
       if (!job) return prevJobs

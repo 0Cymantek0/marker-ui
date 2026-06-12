@@ -172,8 +172,30 @@ export function SettingsPage() {
     }
   }
 
-  // Get currently selected provider for drawers
-  const currentProvider = providers.find((p) => p.id === activeDrawer?.providerId)
+  // Draft state for drawers to avoid mutating the main providers list directly
+  const [draftProvider, setDraftProvider] = useState<LLMProvider | null>(null)
+
+  const openDrawer = (type: 'keys' | 'models', providerId: string) => {
+    const prov = providers.find((p) => p.id === providerId)
+    if (prov) {
+      setDraftProvider(JSON.parse(JSON.stringify(prov)))
+      setActiveDrawer({ type, providerId })
+    }
+  }
+
+  const closeDrawer = () => {
+    setActiveDrawer(null)
+    setDraftProvider(null)
+  }
+
+  const updateDraft = (updater: (draft: LLMProvider) => void) => {
+    setDraftProvider((prev) => {
+      if (!prev) return null
+      const nextDraft = JSON.parse(JSON.stringify(prev))
+      updater(nextDraft)
+      return nextDraft
+    })
+  }
 
   // Save full providers configuration
   const handleSaveProviders = async (updatedProviders: LLMProvider[]) => {
@@ -185,6 +207,15 @@ export function SettingsPage() {
       const msg = err instanceof Error ? err.message : 'Failed to save configuration'
       toast.error(msg)
     }
+  }
+
+  const handleSaveDrawer = async () => {
+    if (!draftProvider) return
+    const updated = providers.map((p) =>
+      p.id === draftProvider.id ? draftProvider : p
+    )
+    await handleSaveProviders(updated)
+    closeDrawer()
   }
 
   // Handle active LLM selection change
@@ -252,7 +283,7 @@ export function SettingsPage() {
 
   // Test Connection helper inside credentials drawer
   const handleTestConnection = async () => {
-    if (!currentProvider) return
+    if (!draftProvider) return
     setIsTesting(true)
     setTestResult(null)
     toast.info('Testing connection to provider...')
@@ -261,35 +292,35 @@ export function SettingsPage() {
       // Map to legacy structure for the backend connection tester
       const backendConfig: any = {
         llm_service: 
-          currentProvider.type === 'custom_openai' ? 'openai' : 
-          currentProvider.type === 'custom_anthropic' ? 'claude' : 
-          currentProvider.type,
+          draftProvider.type === 'custom_openai' ? 'openai' : 
+          draftProvider.type === 'custom_anthropic' ? 'claude' : 
+          draftProvider.type,
         timeout: 15,
         max_retries: 2,
         max_output_tokens: 4096,
       }
 
-      const apiKey = currentProvider.api_key
-      const baseUrl = currentProvider.base_url
-      const model = currentProvider.models[0]?.model_id || 'test'
+      const apiKey = draftProvider.api_key
+      const baseUrl = draftProvider.base_url
+      const model = draftProvider.models[0]?.model_id || 'test'
 
-      if (currentProvider.type === 'gemini' || currentProvider.type === 'vertex') {
+      if (draftProvider.type === 'gemini' || draftProvider.type === 'vertex') {
         backendConfig.gemini_api_key = apiKey
         backendConfig.gemini_model_name = model
-        if (currentProvider.type === 'vertex') {
+        if (draftProvider.type === 'vertex') {
           backendConfig.vertex_project_id = apiKey
           backendConfig.vertex_location = baseUrl
         }
-      } else if (currentProvider.type === 'claude' || currentProvider.type === 'custom_anthropic') {
+      } else if (draftProvider.type === 'claude' || draftProvider.type === 'custom_anthropic') {
         backendConfig.claude_api_key = apiKey
         backendConfig.claude_model_name = model
-        if (currentProvider.type === 'custom_anthropic') {
+        if (draftProvider.type === 'custom_anthropic') {
           backendConfig.openai_base_url = baseUrl
         }
-      } else if (currentProvider.type === 'ollama') {
+      } else if (draftProvider.type === 'ollama') {
         backendConfig.ollama_base_url = baseUrl
         backendConfig.ollama_model = model
-      } else if (currentProvider.type === 'azure') {
+      } else if (draftProvider.type === 'azure') {
         backendConfig.azure_api_key = apiKey
         backendConfig.azure_endpoint = baseUrl
         backendConfig.azure_deployment_name = model
@@ -324,17 +355,17 @@ export function SettingsPage() {
 
   // Fetch models from API inside drawer
   const handleFetchModels = async () => {
-    if (!currentProvider) return
+    if (!draftProvider) return
     setIsFetchingModels(true)
     setFetchedModels([])
     toast.info('Querying provider model list...')
 
     try {
       const list = await fetchAvailableModels(
-        currentProvider.id,
-        currentProvider.type,
-        currentProvider.base_url,
-        currentProvider.api_key
+        draftProvider.id,
+        draftProvider.type,
+        draftProvider.base_url,
+        draftProvider.api_key
       )
       setFetchedModels(list)
       if (list.length === 0) {
@@ -491,12 +522,12 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/10">
+                 <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/10">
                   <Button
                     variant="outline"
                     onClick={() => {
                       setTestResult(null)
-                      setActiveDrawer({ type: 'keys', providerId: p.id })
+                      openDrawer('keys', p.id)
                     }}
                     className="flex-1 text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg border-border/50 hover:bg-muted/40"
                   >
@@ -510,7 +541,7 @@ export function SettingsPage() {
                       setModelSearchQuery('')
                       setCustomModelId('')
                       setExpandedModelSettings(null)
-                      setActiveDrawer({ type: 'models', providerId: p.id })
+                      openDrawer('models', p.id)
                     }}
                     className="flex-1 text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg border-border/50 hover:bg-muted/40"
                   >
@@ -653,10 +684,10 @@ export function SettingsPage() {
       </div>
 
       {/* Slide-over Drawer for API Keys & Credentials */}
-      {activeDrawer && activeDrawer.type === 'keys' && currentProvider && (
+      {activeDrawer && activeDrawer.type === 'keys' && draftProvider && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-300">
           {/* Backdrop Dismiss Click */}
-          <div className="absolute inset-0" onClick={() => setActiveDrawer(null)} />
+          <div className="absolute inset-0" onClick={closeDrawer} />
 
           {/* Panel */}
           <div className="relative w-full max-w-md bg-background border-l border-border/60 shadow-2xl h-full flex flex-col text-left z-10 animate-slide-in">
@@ -666,14 +697,14 @@ export function SettingsPage() {
                 <Key className="w-5 h-5 text-primary" />
                 <div>
                   <h3 className="font-extrabold text-sm text-foreground uppercase tracking-wider">
-                    {currentProvider.label} Credentials
+                    {draftProvider.label} Credentials
                   </h3>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Manage API endpoints, keys, and fallbacks.</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveDrawer(null)}
+                onClick={closeDrawer}
                 className="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -683,24 +714,23 @@ export function SettingsPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {/* Base URL (if applicable) */}
-              {currentProvider.type !== 'gemini' && currentProvider.type !== 'claude' && (
+              {draftProvider.type !== 'gemini' && draftProvider.type !== 'claude' && (
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                    {currentProvider.type === 'azure' ? 'Azure Endpoint URL' : 'API Base URL'}
+                    {draftProvider.type === 'azure' ? 'Azure Endpoint URL' : 'API Base URL'}
                   </label>
                   <Input
-                    value={currentProvider.base_url || ''}
+                    value={draftProvider.base_url || ''}
                     onChange={(e) => {
-                      const updated = providers.map((p) =>
-                        p.id === currentProvider.id ? { ...p, base_url: e.target.value } : p
-                      )
-                      setProviders(updated)
+                      updateDraft((draft) => {
+                        draft.base_url = e.target.value
+                      })
                     }}
                     placeholder={
-                      currentProvider.type === 'azure'
+                      draftProvider.type === 'azure'
                         ? 'https://your-resource.openai.azure.com'
-                        : currentProvider.type === 'ollama'
+                        : draftProvider.type === 'ollama'
                         ? 'http://localhost:11434'
                         : 'https://api.example.com/v1'
                     }
@@ -710,23 +740,22 @@ export function SettingsPage() {
               )}
 
               {/* Primary API Key */}
-              {currentProvider.type !== 'ollama' && (
+              {draftProvider.type !== 'ollama' && (
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase flex items-center gap-1.5">
                     <Key className="w-3.5 h-3.5 text-muted-foreground" />
-                    {currentProvider.type === 'vertex' ? 'Google Cloud Project ID' : 'Primary API Key'}
+                    {draftProvider.type === 'vertex' ? 'Google Cloud Project ID' : 'Primary API Key'}
                   </label>
                   <Input
                     type="password"
-                    value={currentProvider.api_key || ''}
+                    value={draftProvider.api_key || ''}
                     onChange={(e) => {
-                      const updated = providers.map((p) =>
-                        p.id === currentProvider.id ? { ...p, api_key: e.target.value } : p
-                      )
-                      setProviders(updated)
+                      updateDraft((draft) => {
+                        draft.api_key = e.target.value
+                      })
                     }}
                     placeholder={
-                      currentProvider.type === 'vertex'
+                      draftProvider.type === 'vertex'
                         ? 'e.g., my-gcp-project-123'
                         : 'Enter credentials token'
                     }
@@ -736,23 +765,20 @@ export function SettingsPage() {
               )}
 
               {/* Fallback API Keys (up to 5) */}
-              {currentProvider.type !== 'ollama' && currentProvider.type !== 'vertex' && (
+              {draftProvider.type !== 'ollama' && draftProvider.type !== 'vertex' && (
                 <div className="space-y-3 pt-2 border-t border-border/10">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase flex items-center gap-1.5">
                       <ListPlus className="w-3.5 h-3.5 text-muted-foreground" />
-                      Fallback API Keys ({currentProvider.fallback_api_keys.length}/5)
+                      Fallback API Keys ({draftProvider.fallback_api_keys.length}/5)
                     </label>
-                    {currentProvider.fallback_api_keys.length < 5 && (
+                    {draftProvider.fallback_api_keys.length < 5 && (
                       <button
                         type="button"
                         onClick={() => {
-                          const updated = providers.map((p) =>
-                            p.id === currentProvider.id
-                              ? { ...p, fallback_api_keys: [...p.fallback_api_keys, ''] }
-                              : p
-                          )
-                          setProviders(updated)
+                          updateDraft((draft) => {
+                            draft.fallback_api_keys.push('')
+                          })
                         }}
                         className="text-[10px] font-bold text-primary hover:underline uppercase flex items-center gap-1"
                       >
@@ -762,19 +788,16 @@ export function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {currentProvider.fallback_api_keys.map((keyVal, idx) => (
+                    {draftProvider.fallback_api_keys.map((keyVal, idx) => (
                       <div key={idx} className="flex gap-2 items-center">
                         <span className="text-[10px] font-bold font-mono text-muted-foreground shrink-0 w-4">#{idx + 1}</span>
                         <Input
                           type="password"
                           value={keyVal}
                           onChange={(e) => {
-                            const newFallbacks = [...currentProvider.fallback_api_keys]
-                            newFallbacks[idx] = e.target.value
-                            const updated = providers.map((p) =>
-                              p.id === currentProvider.id ? { ...p, fallback_api_keys: newFallbacks } : p
-                            )
-                            setProviders(updated)
+                            updateDraft((draft) => {
+                              draft.fallback_api_keys[idx] = e.target.value
+                            })
                           }}
                           placeholder={`Fallback key ${idx + 1}`}
                           className="bg-background/50 text-xs flex-1"
@@ -782,11 +805,9 @@ export function SettingsPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            const newFallbacks = currentProvider.fallback_api_keys.filter((_, i) => i !== idx)
-                            const updated = providers.map((p) =>
-                              p.id === currentProvider.id ? { ...p, fallback_api_keys: newFallbacks } : p
-                            )
-                            setProviders(updated)
+                            updateDraft((draft) => {
+                              draft.fallback_api_keys = draft.fallback_api_keys.filter((_, i) => i !== idx)
+                            })
                           }}
                           className="p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
                         >
@@ -794,7 +815,7 @@ export function SettingsPage() {
                         </button>
                       </div>
                     ))}
-                    {currentProvider.fallback_api_keys.length === 0 && (
+                    {draftProvider.fallback_api_keys.length === 0 && (
                       <div className="text-[11px] text-muted-foreground/60 italic py-2 text-center">
                         No fallback API keys configured.
                       </div>
@@ -831,7 +852,7 @@ export function SettingsPage() {
               <Button
                 variant="outline"
                 onClick={handleTestConnection}
-                disabled={isTesting || currentProvider.type === 'vertex'}
+                disabled={isTesting || draftProvider.type === 'vertex'}
                 className="text-xs font-bold uppercase tracking-wider px-4 rounded-lg h-10 border-border/60 hover:bg-muted/50 gap-1.5"
               >
                 {isTesting ? (
@@ -845,16 +866,13 @@ export function SettingsPage() {
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
-                  onClick={() => setActiveDrawer(null)}
+                  onClick={closeDrawer}
                   className="text-xs font-bold uppercase tracking-wider px-4 rounded-lg h-10"
                 >
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => {
-                    void handleSaveProviders(providers)
-                    setActiveDrawer(null)
-                  }}
+                  onClick={handleSaveDrawer}
                   className="text-xs font-bold uppercase tracking-wider px-5 rounded-lg shadow-sm h-10 gap-1.5"
                 >
                   <Save className="w-4 h-4" />
@@ -867,9 +885,9 @@ export function SettingsPage() {
       )}
 
       {/* Slide-over Drawer for Model Management */}
-      {activeDrawer && activeDrawer.type === 'models' && currentProvider && (
+      {activeDrawer && activeDrawer.type === 'models' && draftProvider && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-300">
-          <div className="absolute inset-0" onClick={() => setActiveDrawer(null)} />
+          <div className="absolute inset-0" onClick={closeDrawer} />
 
           <div className="relative w-full max-w-md bg-background border-l border-border/60 shadow-2xl h-full flex flex-col text-left z-10 animate-slide-in">
             {/* Header */}
@@ -878,14 +896,14 @@ export function SettingsPage() {
                 <Settings className="w-5 h-5 text-primary" />
                 <div>
                   <h3 className="font-extrabold text-sm text-foreground uppercase tracking-wider">
-                    {currentProvider.label} Models
+                    {draftProvider.label} Models
                   </h3>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Add, query, and edit model threshold parameters.</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveDrawer(null)}
+                onClick={closeDrawer}
                 className="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -895,7 +913,7 @@ export function SettingsPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Fetch models action */}
-              {currentProvider.type !== 'vertex' && (
+              {draftProvider.type !== 'vertex' && (
                 <div className="bg-card/40 border border-border/40 p-4 rounded-xl space-y-3.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-extrabold tracking-widest text-muted-foreground uppercase">Query API Models List</span>
@@ -922,7 +940,7 @@ export function SettingsPage() {
                         {fetchedModels
                           .filter((m) => m.toLowerCase().includes(modelSearchQuery.toLowerCase()))
                           .map((modelId) => {
-                            const alreadyAdded = currentProvider.models.some((m) => m.model_id === modelId)
+                            const alreadyAdded = draftProvider.models.some((m) => m.model_id === modelId)
                             return (
                               <div key={modelId} className="flex items-center justify-between p-2 text-xs">
                                 <span className="font-mono font-semibold truncate max-w-[75%]" title={modelId}>
@@ -935,12 +953,9 @@ export function SettingsPage() {
                                     type="button"
                                     onClick={() => {
                                       const newModel: ModelConfig = { model_id: modelId }
-                                      const updated = providers.map((p) =>
-                                        p.id === currentProvider.id
-                                          ? { ...p, models: [...p.models, newModel] }
-                                          : p
-                                      )
-                                      setProviders(updated)
+                                      updateDraft((draft) => {
+                                        draft.models.push(newModel)
+                                      })
                                       toast.success(`Model "${modelId}" added`)
                                     }}
                                     className="text-[10px] font-bold text-primary hover:underline uppercase"
@@ -972,15 +987,14 @@ export function SettingsPage() {
                     onClick={() => {
                       const cleanId = customModelId.trim()
                       if (!cleanId) return
-                      if (currentProvider.models.some((m) => m.model_id === cleanId)) {
+                      if (draftProvider.models.some((m) => m.model_id === cleanId)) {
                         toast.error('Model ID already exists')
                         return
                       }
                       const newModel: ModelConfig = { model_id: cleanId }
-                      const updated = providers.map((p) =>
-                        p.id === currentProvider.id ? { ...p, models: [...p.models, newModel] } : p
-                      )
-                      setProviders(updated)
+                      updateDraft((draft) => {
+                        draft.models.push(newModel)
+                      })
                       setCustomModelId('')
                       toast.success(`Model "${cleanId}" added`)
                     }}
@@ -994,11 +1008,11 @@ export function SettingsPage() {
               {/* Configured Models List */}
               <div className="space-y-3 pt-4 border-t border-border/15">
                 <label className="text-[10px] font-bold tracking-widest text-muted-foreground/80 uppercase block">
-                  Configured Models ({currentProvider.models.length})
+                  Configured Models ({draftProvider.models.length})
                 </label>
 
                 <div className="space-y-2">
-                  {currentProvider.models.map((model, mIdx) => {
+                  {draftProvider.models.map((model, mIdx) => {
                     const isExpanded = expandedModelSettings === model.model_id
                     return (
                       <div
@@ -1025,11 +1039,9 @@ export function SettingsPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              const updatedModels = currentProvider.models.filter((_, i) => i !== mIdx)
-                              const updated = providers.map((p) =>
-                                p.id === currentProvider.id ? { ...p, models: updatedModels } : p
-                              )
-                              setProviders(updated)
+                              updateDraft((draft) => {
+                                draft.models = draft.models.filter((_, i) => i !== mIdx)
+                              })
                               toast.info(`Model "${model.model_id}" removed`)
                               if (isExpanded) setExpandedModelSettings(null)
                             }}
@@ -1055,12 +1067,9 @@ export function SettingsPage() {
                                   value={model.timeout ?? ''}
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
-                                    const updatedModels = [...currentProvider.models]
-                                    updatedModels[mIdx] = { ...model, timeout: val }
-                                    const updated = providers.map((p) =>
-                                      p.id === currentProvider.id ? { ...p, models: updatedModels } : p
-                                    )
-                                    setProviders(updated)
+                                    updateDraft((draft) => {
+                                      draft.models[mIdx].timeout = val
+                                    })
                                   }}
                                   placeholder="Default (60s)"
                                   className="text-xs bg-background/50"
@@ -1075,12 +1084,9 @@ export function SettingsPage() {
                                   value={model.max_retries ?? ''}
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
-                                    const updatedModels = [...currentProvider.models]
-                                    updatedModels[mIdx] = { ...model, max_retries: val }
-                                    const updated = providers.map((p) =>
-                                      p.id === currentProvider.id ? { ...p, models: updatedModels } : p
-                                    )
-                                    setProviders(updated)
+                                    updateDraft((draft) => {
+                                      draft.models[mIdx].max_retries = val
+                                    })
                                   }}
                                   placeholder="Default (3)"
                                   className="text-xs bg-background/50"
@@ -1095,12 +1101,9 @@ export function SettingsPage() {
                                   value={model.max_output_tokens ?? ''}
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
-                                    const updatedModels = [...currentProvider.models]
-                                    updatedModels[mIdx] = { ...model, max_output_tokens: val }
-                                    const updated = providers.map((p) =>
-                                      p.id === currentProvider.id ? { ...p, models: updatedModels } : p
-                                    )
-                                    setProviders(updated)
+                                    updateDraft((draft) => {
+                                      draft.models[mIdx].max_output_tokens = val
+                                    })
                                   }}
                                   placeholder="Default (4096)"
                                   className="text-xs bg-background/50"
@@ -1115,12 +1118,9 @@ export function SettingsPage() {
                                   value={model.context_window ?? ''}
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
-                                    const updatedModels = [...currentProvider.models]
-                                    updatedModels[mIdx] = { ...model, context_window: val }
-                                    const updated = providers.map((p) =>
-                                      p.id === currentProvider.id ? { ...p, models: updatedModels } : p
-                                    )
-                                    setProviders(updated)
+                                    updateDraft((draft) => {
+                                      draft.models[mIdx].context_window = val
+                                    })
                                   }}
                                   placeholder="Intelligent auto"
                                   className="text-xs bg-background/50"
@@ -1132,7 +1132,7 @@ export function SettingsPage() {
                       </div>
                     )
                   })}
-                  {currentProvider.models.length === 0 && (
+                  {draftProvider.models.length === 0 && (
                     <div className="text-xs text-muted-foreground/50 italic py-6 text-center border border-dashed border-border/30 rounded-xl bg-card/5">
                       No models configured. Add one above.
                     </div>
@@ -1145,16 +1145,13 @@ export function SettingsPage() {
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border/20 bg-muted/10">
               <Button
                 variant="ghost"
-                onClick={() => setActiveDrawer(null)}
+                onClick={closeDrawer}
                 className="text-xs font-bold uppercase tracking-wider px-4 rounded-lg h-10"
               >
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  void handleSaveProviders(providers)
-                  setActiveDrawer(null)
-                }}
+                onClick={handleSaveDrawer}
                 className="text-xs font-bold uppercase tracking-wider px-5 rounded-lg shadow-sm h-10 gap-1.5"
               >
                 <Save className="w-4 h-4" />

@@ -22,48 +22,51 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
   const [isRetrying, setIsRetrying] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [firstLoadCheck, setFirstLoadCheck] = useState(true)
-  const [startedWithCompleted, setStartedWithCompleted] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let timer: NodeJS.Timeout
+    let active = true
+    let pollTimer: NodeJS.Timeout | null = null
+    let redirectTimer: NodeJS.Timeout | null = null
 
     const pollStatus = async () => {
       try {
         const data = await getModelsStatus()
+        if (!active) return
+
         setStatus(data)
 
         if (firstLoadCheck) {
           setFirstLoadCheck(false)
-          if (data.initialized) {
+          if (data.initialized || data.overall.status === 'completed') {
             onComplete()
             return
-          }
-          if (data.overall.status === 'completed') {
-            setStartedWithCompleted(true)
-            onComplete()
-            return
-          } else {
-            setStartedWithCompleted(false)
           }
         } else {
           if (data.initialized) {
             setShowConfetti(true)
-            const redirectTimer = setTimeout(() => {
-              onComplete()
+            redirectTimer = setTimeout(() => {
+              if (active) onComplete()
             }, 3000)
-            return () => clearTimeout(redirectTimer)
+            return
           }
         }
       } catch (err) {
         console.error('Failed to fetch model status:', err)
       }
-      timer = setTimeout(pollStatus, 1500)
+
+      if (active) {
+        pollTimer = setTimeout(pollStatus, 1500)
+      }
     }
 
     void pollStatus()
 
-    return () => clearTimeout(timer)
-  }, [onComplete, firstLoadCheck, startedWithCompleted])
+    return () => {
+      active = false
+      if (pollTimer) clearTimeout(pollTimer)
+      if (redirectTimer) clearTimeout(redirectTimer)
+    }
+  }, [onComplete, firstLoadCheck])
 
   const handleCancel = async () => {
     setIsCancelling(true)
