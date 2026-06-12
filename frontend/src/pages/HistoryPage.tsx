@@ -114,15 +114,18 @@ export function HistoryPage() {
     }
   }
 
-  const handleDownload = async (e: React.MouseEvent, jobId: string, filename: string) => {
+  const handleDownload = async (e: React.MouseEvent, job: JobStatus) => {
     e.stopPropagation() // Prevent toggling expansion
     try {
-      const blob = await downloadResult(jobId)
+      const blob = await downloadResult(job.id)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const stem = filename.split('.').slice(0, -1).join('.') || 'output'
-      a.download = `marker-${stem}-${jobId}.zip`
+      const isZip = blob.type === 'application/zip'
+      const extMap: Record<string, string> = { markdown: 'md', json: 'json', html: 'html', chunks: 'json' }
+      const ext = isZip ? 'zip' : (extMap[job.output_format || 'markdown'] || 'md')
+      const stem = job.filename.includes('.') ? job.filename.split('.').slice(0, -1).join('.') : job.filename
+      a.download = `${stem}.${ext}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -346,9 +349,9 @@ export function HistoryPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={(e) => handleDownload(e, job.id, job.filename)}
+                          onClick={(e) => handleDownload(e, job)}
                           className="w-8 h-8 rounded-lg hover:bg-muted"
-                          title="Download Zip"
+                          title="Download Result"
                         >
                           <Download className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>

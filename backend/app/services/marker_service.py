@@ -152,6 +152,16 @@ class MarkerService:
         self._lock = threading.Lock()
 
     def initialize(self) -> None:
+        from app.services.gpu_service import gpu_service
+        
+        # Wait for background GPU/CUDA installation to finish before importing torch/marker
+        first_wait = True
+        while gpu_service.status_dict["status"] == "installing":
+            if first_wait:
+                logger.info("GPU installation in progress, waiting before loading models...")
+                first_wait = False
+            time.sleep(5)
+
         with self._lock:
             if self._initialized:
                 return

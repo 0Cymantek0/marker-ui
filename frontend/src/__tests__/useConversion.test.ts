@@ -393,7 +393,7 @@ describe('useConversion', () => {
 
       const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
       expect(anchor).toBeTruthy()
-      expect(anchor.download).toBe('marker-output-test-job-1.md')
+      expect(anchor.download).toBe('test.md')
       expect(anchor.href).toBe('blob:test')
       expect(removeSpy).toHaveBeenCalledWith(anchor)
       expect(revokeUrl).toHaveBeenCalledWith('blob:test')
@@ -429,7 +429,7 @@ describe('useConversion', () => {
       })
 
       const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-      expect(anchor.download).toBe('marker-output-test-job-1.json')
+      expect(anchor.download).toBe('test.json')
 
       appendSpy.mockRestore()
       createUrl.mockRestore()
@@ -460,7 +460,7 @@ describe('useConversion', () => {
       })
 
       const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-      expect(anchor.download).toBe('marker-output-test-job-1.html')
+      expect(anchor.download).toBe('test.html')
 
       appendSpy.mockRestore()
       createUrl.mockRestore()
@@ -491,7 +491,7 @@ describe('useConversion', () => {
       })
 
       const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-      expect(anchor.download).toBe('marker-output-test-job-1.json')
+      expect(anchor.download).toBe('test.json')
 
       appendSpy.mockRestore()
       createUrl.mockRestore()

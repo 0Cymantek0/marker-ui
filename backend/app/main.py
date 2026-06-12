@@ -116,6 +116,20 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         except Exception as e:
             logger.error("Failed to clean up stale jobs on startup: %s", e)
 
+    # Auto-trigger GPU installation if enabled in settings but CUDA is not ready
+    from app.services.gpu_service import gpu_service
+    from app.models.settings import Setting
+    from sqlalchemy import select
+    async with async_session_factory() as session:
+        try:
+            stmt = select(Setting).where(Setting.key == "gpu_acceleration_enabled")
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            if row and row.value == "true" and not gpu_service.status_dict["cuda_available"]:
+                logger.info("GPU acceleration enabled but CUDA not available. Starting background installation...")
+                gpu_service.start_install()
+        except Exception as e:
+            logger.error("Failed to auto-trigger GPU installation: %s", e)
+
     # Apply download tracker monkeypatching
     from app.services.model_tracker import setup_monkeypatch, register_retry_callback
     setup_monkeypatch()

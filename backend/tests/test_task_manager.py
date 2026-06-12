@@ -66,6 +66,20 @@ class TestGetStatus:
         status = task_manager.get_status("fin")
         assert status["status"] == "completed"
 
+    def test_get_status_message_fallback(self, task_manager: TaskManager):
+        task_manager._progress["fallback-job"] = 75
+        task_manager._job_status_text["fallback-job"] = "Starting conversion..."
+        
+        status = task_manager.get_status("fallback-job")
+        assert status["message"] == "Extracting tables..."
+        
+        # Test custom loading status fallback
+        task_manager._progress["fallback-job2"] = 35
+        task_manager._job_status_text["fallback-job2"] = "Loading marker converters..."
+        status2 = task_manager.get_status("fallback-job2")
+        assert status2["message"] == "Detecting document layout..."
+
+
 
 # ---------------------------------------------------------------------------
 # cancel_job

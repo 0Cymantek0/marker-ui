@@ -15,7 +15,7 @@ class GPUService:
     """Manages background installation and status of GPU acceleration (CUDA PyTorch)."""
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._status = "not_installed"  # not_installed, installing, ready, failed
         self._progress = 0
         self._logs: List[str] = []
@@ -96,7 +96,8 @@ class GPUService:
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--force-reinstall",
-                "--no-warn-script-location"
+                "--no-warn-script-location",
+                "--no-cache-dir"
             ]
 
             self.add_log("Executing command: " + " ".join(cmd))
@@ -173,12 +174,14 @@ class GPUService:
                         self._status = "failed"
                         self._progress = 0
                         self._error_message = "CUDA verification failed. Check system GPU drivers."
+                    self._disable_gpu_setting_in_db()
             else:
                 self.add_log(f"Pip installation failed with exit code {return_code}.")
                 with self._lock:
                     self._status = "failed"
                     self._progress = 0
                     self._error_message = f"Pip returned error code {return_code}."
+                self._disable_gpu_setting_in_db()
 
         except Exception as e:
             logger.exception("Error running GPU installation")
@@ -187,5 +190,36 @@ class GPUService:
                 self._status = "failed"
                 self._progress = 0
                 self._error_message = str(e)
+            self._disable_gpu_setting_in_db()
+
+    def _disable_gpu_setting_in_db(self) -> None:
+        """Set gpu_acceleration_enabled to 'false' in settings DB so it won't auto-retry on next run."""
+        self.add_log("Disabling GPU acceleration setting in database to prevent future reinstall loops...")
+        
+        def _db_work() -> None:
+            try:
+                import asyncio
+                async def _async_update() -> None:
+                    async with async_session_factory() as session:
+                        stmt = update(Setting).where(Setting.key == "gpu_acceleration_enabled").values(value="false")
+                        await session.execute(stmt)
+                        await session.commit()
+                        logger.info("Successfully disabled gpu_acceleration_enabled in settings DB.")
+                
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                if loop.is_running():
+                    asyncio.run_coroutine_threadsafe(_async_update(), loop)
+                else:
+                    loop.run_until_complete(_async_update())
+            except Exception as e:
+                logger.error("Failed to disable GPU setting in DB: %s", e)
+                
+        threading.Thread(target=_db_work, daemon=True).start()
 
 gpu_service = GPUService()
+

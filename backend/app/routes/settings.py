@@ -634,7 +634,7 @@ async def init_llm_providers_if_missing(db: AsyncSession) -> None:
         {
             "id": "claude",
             "type": "claude",
-            "label": "Claude",
+            "label": "Anthropic",
             "api_key": encrypt_value(get_old("claude_api_key")) if get_old("claude_api_key") else None,
             "fallback_api_keys": [],
             "models": [

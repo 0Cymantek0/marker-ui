@@ -165,6 +165,20 @@ class TaskManager:
             status = "processing"
 
         message = self._job_status_text.get(job_id, "Processing document...")
+        if message in ("Starting conversion...", "Loading marker converters...") and progress > 10:
+            if progress >= 90:
+                message = "Generating structured output..."
+            elif progress >= 80:
+                message = "Formatting mathematical equations..."
+            elif progress >= 70:
+                message = "Extracting tables..."
+            elif progress >= 50:
+                message = "Performing OCR and text recognition..."
+            elif progress >= 30:
+                message = "Detecting document layout..."
+            else:
+                message = "Processing document..."
+
         logs = self._job_logs.get(job_id, [])
 
         # Calculate elapsed and ETA

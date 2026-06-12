@@ -24,6 +24,7 @@ export interface ConversionState {
   resultBlob: Blob | null
   logs: string[]
   outputFormat: string
+  filename: string | null
 }
 
 const INITIAL_STATE: ConversionState = {
@@ -35,6 +36,7 @@ const INITIAL_STATE: ConversionState = {
   resultBlob: null,
   logs: [],
   outputFormat: 'markdown',
+  filename: null,
 }
 
 export function useConversion() {
@@ -69,6 +71,7 @@ export function useConversion() {
         error: null,
         resultBlob: null,
         outputFormat: config.output_format,
+        filename: file.name,
         logs: [
           `[SYSTEM] Initiating upload process for file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
           '[SYSTEM] Preparing payload headers and checking connection...',
@@ -251,25 +254,23 @@ export function useConversion() {
                     downloadResult(prev.jobId!)
                       .then((blob) => {
                         setState((prev) => ({
+                          ...prev,
                           phase: 'completed',
                           progress: 100,
                           statusText: 'Conversion complete',
-                          jobId: prev.jobId,
                           error: null,
                           resultBlob: blob,
-                          outputFormat: prev.outputFormat,
                           logs: [...prev.logs, '[SUCCESS] SSE disconnected, recovered via polling.'],
                         }))
                       })
                       .catch(() => {
                         setState((prev) => ({
+                          ...prev,
                           phase: 'completed',
                           progress: 100,
                           statusText: 'Conversion complete',
-                          jobId: prev.jobId,
                           error: null,
                           resultBlob: null,
-                          outputFormat: prev.outputFormat,
                           logs: [...prev.logs, '[WARN] SSE disconnected. Polling recovered but download failed.'],
                         }))
                       })
@@ -330,18 +331,22 @@ export function useConversion() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    
     // Inspect if the downloaded package is a ZIP bundle to avoid wrong extension naming
     const isZip = blob.type === 'application/zip'
     const extMap: Record<string, string> = { markdown: 'md', json: 'json', html: 'html', chunks: 'json' }
     const ext = isZip ? 'zip' : (extMap[state.outputFormat] || 'md')
     
-    a.download = `marker-output-${state.jobId}.${ext}`
+    const stem = state.filename
+      ? (state.filename.includes('.')
+        ? state.filename.split('.').slice(0, -1).join('.')
+        : state.filename)
+      : 'output'
+    a.download = `${stem}.${ext}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  }, [state.jobId, state.resultBlob, state.outputFormat])
+  }, [state.jobId, state.resultBlob, state.outputFormat, state.filename])
 
   const clearLogs = useCallback(() => {
     setState((prev) => ({

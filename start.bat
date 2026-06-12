@@ -52,15 +52,26 @@ if not exist ".venv" (
 echo.
 echo [3/6] Installing Python dependencies...
 
-.venv\Scripts\pip.exe install -r backend\requirements.txt --quiet
-if %ERRORLEVEL% neq 0 (
-    echo   WARNING: Full install failed, retrying without [full] extra...
-    findstr /v "marker-pdf\[full\]" backend\requirements.txt > backend\requirements_min.txt
-    .venv\Scripts\pip.exe install -r backend\requirements_min.txt --quiet
-    .venv\Scripts\pip.exe install marker-pdf --quiet
-    del backend\requirements_min.txt
+if not exist ".venv\installed" (
+    .venv\Scripts\pip.exe install -r backend\requirements.txt
+    if !ERRORLEVEL! neq 0 (
+        echo   WARNING: Full install failed, retrying without [full] extra...
+        findstr /v "marker-pdf\[full\]" backend\requirements.txt > backend\requirements_min.txt
+        .venv\Scripts\pip.exe install -r backend\requirements_min.txt
+        .venv\Scripts\pip.exe install marker-pdf
+        del backend\requirements_min.txt
+    )
+    if !ERRORLEVEL! equ 0 (
+        echo. > .venv\installed
+        echo   Python dependencies installed
+    ) else (
+        echo   ERROR: Python dependency installation failed.
+        pause
+        exit /b 1
+    )
+) else (
+    echo   Python dependencies already installed, skipping check.
 )
-echo   Python dependencies installed
 
 :: ── Install Node deps ─────────────────────────────────────────────
 echo.

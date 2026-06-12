@@ -31,6 +31,7 @@ export interface JobState {
   outputDir?: string
   elapsed?: number
   eta?: number
+  isBunch?: boolean
 }
 
 interface ConversionContextType {
@@ -267,6 +268,8 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
 
   const start = useCallback(async (files: File[], localPaths: string[], config: ConversionConfig, outputDir?: string) => {
     const newJobs: JobState[] = []
+    const cleanLocalPaths = localPaths.map((p) => p.trim()).filter((p) => p.length > 0)
+    const isBunch = (files.length + cleanLocalPaths.length) > 1
 
     // Add files
     for (const f of files) {
@@ -285,20 +288,19 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
         logs: [],
         outputFormat: config.output_format,
         outputDir,
+        isBunch,
       })
     }
 
     // Add local paths
-    for (const lp of localPaths) {
-      const cleanPath = lp.trim()
-      if (!cleanPath) continue
+    for (const lp of cleanLocalPaths) {
       const id = 'local-' + Math.random().toString(36).substring(2, 9)
-      const filename = cleanPath.split(/[/\\]/).pop() || cleanPath
+      const filename = lp.split(/[/\\]/).pop() || lp
       newJobs.push({
         id,
         filename,
         file: null,
-        localPath: cleanPath,
+        localPath: lp,
         phase: 'idle',
         progress: 0,
         statusText: 'Queued',
@@ -308,6 +310,7 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
         logs: [],
         outputFormat: config.output_format,
         outputDir,
+        isBunch,
       })
     }
 
@@ -353,7 +356,13 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
     const extMap: Record<string, string> = { markdown: 'md', json: 'json', html: 'html', chunks: 'json' }
     const ext = isZip ? 'zip' : (extMap[job.outputFormat] || 'md')
     
-    a.download = `marker-output-${job.jobId}.${ext}`
+    const stem = job.filename.includes('.') ? job.filename.split('.').slice(0, -1).join('.') : job.filename
+    if (job.isBunch) {
+      a.download = `marker-${stem}.${ext}`
+    } else {
+      a.download = `${stem}.${ext}`
+    }
+
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

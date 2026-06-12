@@ -112,6 +112,14 @@ export function SettingsPage() {
         setGpuStatus(status)
         if (status.status === 'installing') {
           setIsPollingGpu(true)
+        } else if (gpuSetting?.value === 'true' && (status.status === 'not_installed' || status.status === 'failed')) {
+          try {
+            const startStatus = await installGPU()
+            setGpuStatus(startStatus)
+            setIsPollingGpu(true)
+          } catch (e) {
+            console.error('Failed to auto-start GPU installation', e)
+          }
         }
       } catch (err) {
         console.error('Failed to load settings data', err)
@@ -153,9 +161,10 @@ export function SettingsPage() {
       await toggleGPU(checked)
       toast.success(`GPU Acceleration ${checked ? 'enabled' : 'disabled'}`)
       if (checked && (!gpuStatus || gpuStatus.status === 'not_installed' || gpuStatus.status === 'failed')) {
-        await installGPU()
+        toast.info('Installation starting...')
+        const newStatus = await installGPU()
+        setGpuStatus(newStatus)
         setIsPollingGpu(true)
-        toast.info('Installation started...')
       }
     } catch (err) {
       toast.error('Failed to toggle GPU acceleration')
@@ -445,9 +454,8 @@ export function SettingsPage() {
                       </div>
                       <div>
                         <div className="font-extrabold text-sm text-foreground flex items-center gap-1.5 leading-none">
-                          {p.label}
+                          {p.label === 'Claude' ? 'Anthropic' : p.label}
                         </div>
-                        <span className="text-[10px] text-muted-foreground/85 block mt-0.5 capitalize">{p.type.replace('_', ' ')}</span>
                       </div>
                     </div>
 
@@ -540,12 +548,17 @@ export function SettingsPage() {
           </div>
           {/* Toggle Switch */}
           <div className="flex items-center gap-3">
-            {gpuStatus?.status === 'ready' && (
+            {gpuStatus?.status === 'ready' && gpuStatus.cuda_available && (
               <Badge variant="success" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
                 Ready
               </Badge>
             )}
-            {gpuStatus?.status === 'installing' && (
+            {gpuStatus?.status === 'ready' && !gpuStatus.cuda_available && (
+              <Badge variant="warning" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
+                Restart Required
+              </Badge>
+            )}
+            {(gpuStatus?.status === 'installing' || (gpuStatus?.status === 'not_installed' && gpuEnabled)) && (
               <Badge variant="processing" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
                 Installing {gpuStatus.progress}%
               </Badge>
@@ -576,23 +589,38 @@ export function SettingsPage() {
         </div>
 
         {/* Installation Progress & Logs */}
-        {gpuEnabled && gpuStatus && gpuStatus.status !== 'not_installed' && (
-          <div className="space-y-3 p-4 rounded-xl border border-border/50 bg-card/45 animate-fade-in">
-            {/* Progress bar */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-foreground">
-                  {gpuStatus.status === 'installing' && 'Downloading & Installing Backend Components...'}
-                  {gpuStatus.status === 'ready' && 'GPU Acceleration is active and verified.'}
-                  {gpuStatus.status === 'failed' && 'Installation failed.'}
+        {gpuEnabled && gpuStatus && (
+          <div className="space-y-4 p-4 rounded-xl border border-border/50 bg-card/45 animate-fade-in">
+            {/* Custom Text Progress Bar */}
+            <div className="flex flex-col items-center justify-center py-6 bg-black/20 rounded-xl border border-border/10 space-y-3.5 shadow-inner">
+              <div className="flex items-baseline justify-center select-none">
+                <span
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, hsl(var(--primary)) ${gpuStatus.progress}%, hsl(var(--muted-foreground) / 0.25) ${gpuStatus.progress}%)`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    display: 'inline-block',
+                  }}
+                  className="font-black tracking-wider text-xl md:text-2xl uppercase transition-all duration-300 bg-clip-text text-transparent"
+                >
+                  GPU ACCELERATION
                 </span>
-                <span className="font-semibold text-muted-foreground">{gpuStatus.progress}%</span>
               </div>
-              <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="bg-primary h-full transition-all duration-300"
-                  style={{ width: `${gpuStatus.progress}%` }}
-                />
+
+              {/* Status explanation & restart message */}
+              <div className="text-center space-y-1">
+                <p className="text-[11px] text-muted-foreground font-semibold">
+                  {gpuStatus.status === 'not_installed' && 'Setting up GPU Acceleration backend...'}
+                  {gpuStatus.status === 'installing' && 'Downloading & Installing Backend Components...'}
+                  {gpuStatus.status === 'ready' && 'GPU Acceleration backend components are ready.'}
+                  {gpuStatus.status === 'failed' && 'Installation failed.'}
+                </p>
+                
+                {gpuStatus.status === 'ready' && gpuStatus.cuda_available && (
+                  <span className="text-[9px] text-emerald-500/80 font-extrabold uppercase tracking-widest select-none">
+                    GPU Acceleration is active and running
+                  </span>
+                )}
               </div>
             </div>
 

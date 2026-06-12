@@ -4,11 +4,9 @@ import {
   Loader2,
   Play,
   XCircle,
-  Cpu,
   Database,
   ArrowRight,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import type { ModelTrackerStatus } from '@/lib/api'

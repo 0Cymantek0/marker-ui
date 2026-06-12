@@ -350,9 +350,11 @@ async def download_result(
             tmp_zip.unlink(missing_ok=True)
             raise
 
+    ext = Path(job.result_path).suffix.lstrip(".") or "md"
+    filename = f"{Path(job.original_name).stem}.{ext}"
     return FileResponse(
         path=job.result_path,
-        filename=Path(job.result_path).name,
+        filename=filename,
     )
 
 
