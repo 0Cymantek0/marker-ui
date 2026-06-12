@@ -1286,7 +1286,7 @@ export function SettingsPage() {
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
                                     updateDraft((draft) => {
-                                      draft.models[mIdx].timeout = val
+                                      const m = draft.models[mIdx]; if (m) m.timeout = val
                                     })
                                   }}
                                   placeholder="Default (60s)"
@@ -1303,7 +1303,7 @@ export function SettingsPage() {
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
                                     updateDraft((draft) => {
-                                      draft.models[mIdx].max_retries = val
+                                      const m = draft.models[mIdx]; if (m) m.max_retries = val
                                     })
                                   }}
                                   placeholder="Default (3)"
@@ -1320,7 +1320,7 @@ export function SettingsPage() {
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
                                     updateDraft((draft) => {
-                                      draft.models[mIdx].max_output_tokens = val
+                                      const m = draft.models[mIdx]; if (m) m.max_output_tokens = val
                                     })
                                   }}
                                   placeholder="Default (4096)"
@@ -1337,7 +1337,7 @@ export function SettingsPage() {
                                   onChange={(e) => {
                                     const val = e.target.value ? Number(e.target.value) : undefined
                                     updateDraft((draft) => {
-                                      draft.models[mIdx].context_window = val
+                                      const m = draft.models[mIdx]; if (m) m.context_window = val
                                     })
                                   }}
                                   placeholder="Intelligent auto"

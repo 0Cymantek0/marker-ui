@@ -89,7 +89,7 @@ describe('SettingsPage component', () => {
     const modelsButtons = screen.getAllByRole('button', { name: /Models \(\d+\)/ })
     // The first one is for Gemini (models length 1)
     await act(async () => {
-      fireEvent.click(modelsButtons[0])
+      fireEvent.click(modelsButtons[0]!)
     })
 
     // Drawer should show
@@ -117,7 +117,7 @@ describe('SettingsPage component', () => {
     // Open Models drawer for Gemini
     const modelsButtons = screen.getAllByRole('button', { name: /Models \(\d+\)/ })
     await act(async () => {
-      fireEvent.click(modelsButtons[0])
+      fireEvent.click(modelsButtons[0]!)
     })
 
     // Fetch models list
@@ -130,7 +130,7 @@ describe('SettingsPage component', () => {
     const addBtns = screen.getAllByRole('button', { name: 'Add' })
     // The first one is typically the fetched model list's "Add" button
     await act(async () => {
-      fireEvent.click(addBtns[0])
+      fireEvent.click(addBtns[0]!)
     })
 
     expect(toast.success).toHaveBeenCalledWith('Model "gemini-3-flash-preview" added')
@@ -145,7 +145,7 @@ describe('SettingsPage component', () => {
 
     // Open models drawer again
     await act(async () => {
-      fireEvent.click(modelsButtons[0])
+      fireEvent.click(modelsButtons[0]!)
     })
 
     // Fetch models again
@@ -156,7 +156,7 @@ describe('SettingsPage component', () => {
     // Click add again
     const addBtns2 = screen.getAllByRole('button', { name: 'Add' })
     await act(async () => {
-      fireEvent.click(addBtns2[0])
+      fireEvent.click(addBtns2[0]!)
     })
 
     // Now click Save Models
@@ -167,7 +167,7 @@ describe('SettingsPage component', () => {
 
     // Verify it saved the updated list containing the new model
     expect(api.saveLLMProviders).toHaveBeenCalled()
-    const savedArg = vi.mocked(api.saveLLMProviders).mock.calls[0][0]
+    const savedArg = vi.mocked(api.saveLLMProviders).mock.calls[0]![0]
     const geminiSaved = savedArg.find(p => p.id === 'gemini')
     expect(geminiSaved?.models).toContainEqual({ model_id: 'gemini-3-flash-preview' })
   })
