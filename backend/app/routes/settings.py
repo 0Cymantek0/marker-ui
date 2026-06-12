@@ -1,4 +1,4 @@
-"""Settings CRUD endpoints — key/value store grouped by category."""
+"""Settings CRUD endpoints - key/value store grouped by category."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 # ------------------------------------------------------------------
-# SSRF protection — allowed LLM service hosts
+# SSRF protection - allowed LLM service hosts
 # ------------------------------------------------------------------
 
 
@@ -371,7 +371,7 @@ async def test_llm_connection(
 
     service = body.llm_service
     if service == "no_llm":
-        return {"success": True, "message": "No LLM service configured — connection not tested."}
+        return {"success": True, "message": "No LLM service configured - connection not tested."}
 
     timeout = httpx.Timeout(15.0, connect=5.0)
 

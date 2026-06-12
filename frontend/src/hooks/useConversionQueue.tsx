@@ -104,7 +104,7 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
   const handleJobSSEDisconnected = useCallback((id: string, jobId: string) => {
     updateJob(id, (prev) => ({
       ...prev,
-      statusText: 'Connection lost — polling for status...',
+      statusText: 'Connection lost - polling for status...',
       logs: [...prev.logs, '[WARN] SSE socket disconnected. Falling back to polling...'],
     }))
 

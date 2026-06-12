@@ -67,7 +67,7 @@ def decrypt_value(ciphertext: str) -> str:
         return f.decrypt(ciphertext.encode()).decode()
     except Exception:
         # If decryption fails, return as-is (might be plaintext from before encryption was added)
-        logger.warning("Failed to decrypt value — may be legacy plaintext")
+        logger.warning("Failed to decrypt value - may be legacy plaintext")
         return ciphertext
 
 

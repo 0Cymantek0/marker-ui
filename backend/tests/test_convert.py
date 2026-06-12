@@ -40,7 +40,7 @@ async def _upload_file(
 
 
 # ---------------------------------------------------------------------------
-# Upload — valid extension
+# Upload - valid extension
 # ---------------------------------------------------------------------------
 
 
@@ -70,7 +70,7 @@ async def test_upload_valid_docx(client: AsyncClient):
 
 
 # ---------------------------------------------------------------------------
-# Upload — invalid extension
+# Upload - invalid extension
 # ---------------------------------------------------------------------------
 
 
@@ -89,7 +89,7 @@ async def test_upload_invalid_extension_returns_400(
 
 
 # ---------------------------------------------------------------------------
-# Upload — exceeds size limit
+# Upload - exceeds size limit
 # ---------------------------------------------------------------------------
 
 
@@ -294,7 +294,7 @@ async def test_cancelled_job_stays_cancelled(
     result = await db_session.execute(stmt)
     fresh = result.scalar_one()
     assert fresh.status == "cancelled", (
-        f"Expected 'cancelled' but got '{fresh.status}' — _fail_job overwrote it!"
+        f"Expected 'cancelled' but got '{fresh.status}' - _fail_job overwrote it!"
     )
 
 

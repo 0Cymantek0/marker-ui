@@ -304,7 +304,7 @@ class TaskManager:
         config: dict[str, Any],
         marker_service: Any,
     ) -> dict[str, Any]:
-        """Runs inside ThreadPoolExecutor — updates DB on completion."""
+        """Runs inside ThreadPoolExecutor - updates DB on completion."""
         self._pids[job_id] = os.getpid()
         thread_ident = threading.get_ident()
         active_conversion_threads[thread_ident] = job_id
@@ -353,7 +353,7 @@ class TaskManager:
             self._pids.pop(job_id, None)
 
     # ------------------------------------------------------------------
-    # DB helpers (async — called via asyncio.run from thread)
+    # DB helpers (async - called via asyncio.run from thread)
     # ------------------------------------------------------------------
 
     async def _update_job_status(self, job_id: str, status: str) -> None:

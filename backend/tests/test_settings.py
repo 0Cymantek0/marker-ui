@@ -56,7 +56,7 @@ async def settings_client(settings_session):
 
 
 # ===========================================================================
-# SSRF — validate_llm_url
+# SSRF - validate_llm_url
 # ===========================================================================
 
 
@@ -308,7 +308,7 @@ class TestLLMConfigEndpoint:
         # API key should be masked in response
         assert "*" in body["openai_api_key"]
 
-        # Read it back — should still be masked
+        # Read it back - should still be masked
         resp = await settings_client.get("/api/settings/llm/config")
         body = resp.json()
         assert body["llm_service"] == "openai"

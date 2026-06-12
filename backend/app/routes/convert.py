@@ -1,4 +1,4 @@
-"""Conversion endpoints — upload, status, download, history."""
+"""Conversion endpoints - upload, status, download, history."""
 
 from __future__ import annotations
 
@@ -403,7 +403,7 @@ async def get_history(
                 status=j.status,
                 progress=j.progress,
                 error_message=j.error_message,
-                result_text=None,  # Exclude from history — use /status endpoint for full text
+                result_text=None,  # Exclude from history - use /status endpoint for full text
                 created_at=j.created_at,
                 completed_at=j.completed_at,
                 filename=j.original_name,

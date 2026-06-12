@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────
-# Marker UI — Single-container Docker image
+# Marker UI - Single-container Docker image
 # Runs: uvicorn (backend:8000) + nginx (frontend:80, proxies /api→8000)
 # ──────────────────────────────────────────────────────────────────────
 

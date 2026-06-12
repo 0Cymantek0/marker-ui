@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# Marker UI — One-click launcher (Linux / macOS)
+# Marker UI - One-click launcher (Linux / macOS)
 # Usage: chmod +x start.sh && ./start.sh
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 echo ""
 echo "  ========================================"
-echo "      Marker UI — One-Click Launcher"
+echo "      Marker UI - One-Click Launcher"
 echo "  ========================================"
 echo ""
 

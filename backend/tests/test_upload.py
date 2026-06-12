@@ -1,4 +1,4 @@
-"""Tests for upload endpoint — extension allowlist, size limit, streaming."""
+"""Tests for upload endpoint - extension allowlist, size limit, streaming."""
 
 import io
 from unittest.mock import AsyncMock, MagicMock, patch

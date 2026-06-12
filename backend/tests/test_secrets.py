@@ -1,4 +1,4 @@
-"""Tests for app.utils.secrets — encryption, decryption, masking."""
+"""Tests for app.utils.secrets - encryption, decryption, masking."""
 
 import pytest
 
@@ -41,7 +41,7 @@ class TestEncryptDecrypt:
         assert decrypt_value(encrypt_value(plain)) == plain
 
     def test_roundtrip_unicode(self):
-        plain = "密钥🔑key"
+        plain = "密钥key"
         assert decrypt_value(encrypt_value(plain)) == plain
 
     def test_different_plaintexts_produce_different_ciphertexts(self):
@@ -50,7 +50,7 @@ class TestEncryptDecrypt:
         assert e1 != e2
 
     def test_same_plaintext_produces_different_ciphertexts(self):
-        """Fernet uses a timestamp — encrypting the same value twice gives different ciphertext."""
+        """Fernet uses a timestamp - encrypting the same value twice gives different ciphertext."""
         e1 = encrypt_value("same-value")
         e2 = encrypt_value("same-value")
         assert e1 != e2
@@ -167,7 +167,7 @@ class TestIsMasked:
         assert is_masked("hello") is False
 
     def test_exactly_8_chars_asterisks(self):
-        # "********" — middle = 0 chars → should fail since len(middle) == 0
+        # "********" - middle = 0 chars -> should fail since len(middle) == 0
         # Wait: for len > 8: middle = value[4:-4], if len == 8 then middle is empty
         # Actually len("********") == 8, which is <= 8, so goes to value == "****" check
         # "********" != "****" → False

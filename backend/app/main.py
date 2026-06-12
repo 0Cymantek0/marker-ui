@@ -153,7 +153,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow Vite dev server
+# CORS - allow Vite dev server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

@@ -177,5 +177,5 @@ echo   Close this window to stop all services.
 echo   ========================================
 echo.
 
-:: Keep window open — user closes window to stop
+:: Keep window open - user closes window to stop
 pause

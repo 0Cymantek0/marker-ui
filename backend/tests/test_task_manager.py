@@ -1,4 +1,4 @@
-"""Tests for TaskManager — SSE, cancellation, PID tracking, status."""
+"""Tests for TaskManager - SSE, cancellation, PID tracking, status."""
 
 import asyncio
 import json

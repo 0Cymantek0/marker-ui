@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Marker UI — One-click launcher (PowerShell)
+    Marker UI - One-click launcher (PowerShell)
 .DESCRIPTION
     Checks Python 3.10+ and Node 18+, installs dependencies,
     creates a virtual environment, and starts both backend and frontend.
@@ -14,7 +14,7 @@ Set-Location $PSScriptRoot
 Write-Host ""
 Write-Host "  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _  _" -ForegroundColor DarkGray
 Write-Host " |                                                    |" -ForegroundColor DarkGray
-Write-Host " |          Marker UI — One-Click Launcher            |" -ForegroundColor Cyan
+Write-Host " |          Marker UI - One-Click Launcher            |" -ForegroundColor Cyan
 Write-Host " |                                                    |" -ForegroundColor DarkGray
 Write-Host "  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -" -ForegroundColor DarkGray
 Write-Host ""
@@ -120,7 +120,7 @@ Write-Host "[3/6] Installing Python dependencies (first run may take a while)...
 }
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  WARNING: Some dependencies may have failed. Retrying without [full] extra..." -ForegroundColor DarkYellow
-    # Retry without the [full] extra — core PDF support still works
+    # Retry without the [full] extra - core PDF support still works
     $filteredReqs = Get-Content backend/requirements.txt | Where-Object {
         $_ -notmatch "marker-pdf\[full\]"
     }
@@ -204,7 +204,7 @@ if ($backendJob.HasExited) {
     exit 1
 }
 
-# Frontend — use cmd.exe because npm is a .cmd file on Windows, not a real .exe
+# Frontend - use cmd.exe because npm is a .cmd file on Windows, not a real .exe
 Write-Host "  Starting frontend on http://localhost:5173 ..." -ForegroundColor Cyan
 if ($IsWindows -or $env:OS -match "Windows") {
     $frontendJob = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "set BACKEND_PORT=$backendPort&& npm run dev" -WorkingDirectory "$PWD\frontend" -PassThru -WindowStyle Hidden
@@ -230,7 +230,7 @@ Write-Host ""
 
 # Wait for user to press Ctrl+C
 try {
-    # Monitor processes — if either dies, report it
+    # Monitor processes - if either dies, report it
     while ($true) {
         if ($backendJob.HasExited) {
             Write-Host "  Backend process exited unexpectedly." -ForegroundColor Red

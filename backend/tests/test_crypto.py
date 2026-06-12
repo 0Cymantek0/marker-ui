@@ -17,7 +17,7 @@ def test_encrypt_value_produces_non_plaintext():
     plaintext = "sk-1234567890abcdef"
     encrypted = encrypt_value(plaintext)
     assert encrypted != plaintext
-    # Fernet tokens are base64 — they should be longer and contain no raw secret
+    # Fernet tokens are base64 - they should be longer and contain no raw secret
     assert len(encrypted) > len(plaintext)
 
 
