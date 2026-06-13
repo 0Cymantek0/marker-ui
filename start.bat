@@ -111,16 +111,6 @@ echo.
 :: Find a free port for the backend (starting from 8000)
 set BACKEND_PORT=8000
 
-echo   Checking and cleaning up any orphaned processes on port 8000 and 5173...
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":8000 .*LISTENING"') do (
-    echo     Killing orphaned backend process %%a...
-    taskkill /F /PID %%a >nul 2>&1
-)
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":5173 .*LISTENING"') do (
-    echo     Killing orphaned frontend process %%a...
-    taskkill /F /PID %%a >nul 2>&1
-)
-
 :findPort
     netstat -aon | findstr /R /C:":!BACKEND_PORT! .*LISTENING" >nul 2>&1
     if !ERRORLEVEL! equ 0 (
@@ -135,6 +125,25 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":5173 .*LISTENING"') d
 
 if not "!BACKEND_PORT!"=="8000" (
     echo   Port 8000 is in use, using port !BACKEND_PORT! instead.
+)
+
+:: Find a free port for the frontend (starting from 5173)
+set FRONTEND_PORT=5173
+
+:findFrontendPort
+    netstat -aon | findstr /R /C:":!FRONTEND_PORT! .*LISTENING" >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
+        set /a FRONTEND_PORT+=1
+        if !FRONTEND_PORT! geq 65535 (
+            echo   ERROR: No free port found for frontend.
+            pause
+            exit /b 1
+        )
+        goto findFrontendPort
+    )
+
+if not "!FRONTEND_PORT!"=="5173" (
+    echo   Port 5173 is in use, using port !FRONTEND_PORT! instead.
 )
 
 echo   Starting backend on http://localhost:!BACKEND_PORT! ...
@@ -158,9 +167,9 @@ goto checkBackendLoop
 :backendStarted
 echo   Backend is listening on port !BACKEND_PORT!.
 
-echo   Starting frontend on http://localhost:5173 ...
+echo   Starting frontend on http://localhost:!FRONTEND_PORT! ...
 cd frontend
-start "" /B cmd /c "set BACKEND_PORT=!BACKEND_PORT!&& npm run dev"
+start "" /B cmd /c "set BACKEND_PORT=!BACKEND_PORT!&& npm run dev -- --port !FRONTEND_PORT!"
 cd ..
 
 ping -n 4 127.0.0.1 >nul
@@ -169,7 +178,7 @@ echo.
 echo   ========================================
 echo   Marker UI is running!
 echo.
-echo     Frontend:  http://localhost:5173
+echo     Frontend:  http://localhost:%FRONTEND_PORT%
 echo     Backend:   http://localhost:%BACKEND_PORT%
 echo     API Docs:  http://localhost:%BACKEND_PORT%/docs
 echo.

@@ -98,11 +98,48 @@ export interface ActiveLLM {
   model_id: string
 }
 
+export interface BackendLLMConfig {
+  llm_service: string
+  timeout?: number
+  max_retries?: number
+  max_output_tokens?: number
+  gemini_api_key?: string | null
+  gemini_model_name?: string | null
+  openai_api_key?: string | null
+  openai_base_url?: string | null
+  openai_model?: string | null
+  claude_api_key?: string | null
+  claude_model_name?: string | null
+  vertex_project_id?: string | null
+  azure_api_key?: string | null
+  azure_endpoint?: string | null
+  azure_deployment_name?: string | null
+  ollama_base_url?: string | null
+  ollama_model?: string | null
+}
+
+export interface BackendJobStatus {
+  job_id: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+  progress: number
+  output_format: string
+  converter: string
+  created_at: string
+  completed_at: string | null
+  error_message: string | null
+  result_text: string | null
+  filename: string
+  message?: string | null
+  logs?: string | null
+  elapsed?: number | null
+  eta?: number | null
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 // Convert backend LLMConfig to frontend LLMConfig
-function mapBackendToFrontendLLM(backend: any): LLMConfig {
-  const service = backend.llm_service === 'no_llm' ? 'none' : backend.llm_service;
+function mapBackendToFrontendLLM(backend: BackendLLMConfig): LLMConfig {
+  const service = backend.llm_service === 'no_llm' ? 'none' : backend.llm_service as LLMService;
   let api_key = '';
   let base_url = '';
   let model_name = '';
@@ -146,9 +183,9 @@ function mapBackendToFrontendLLM(backend: any): LLMConfig {
 }
 
 // Convert frontend LLMConfig to backend LLMConfig
-function mapFrontendToBackendLLM(frontend: LLMConfig): any {
+function mapFrontendToBackendLLM(frontend: LLMConfig): BackendLLMConfig {
   const llm_service = frontend.service === 'none' ? 'no_llm' : frontend.service;
-  const backend: any = {
+  const backend: BackendLLMConfig = {
     llm_service,
     timeout: frontend.timeout,
     max_retries: frontend.max_retries,
@@ -252,7 +289,7 @@ export async function uploadFile(
 }
 
 export async function getJobStatus(jobId: string): Promise<JobStatus> {
-  const res = await request<any>(`/convert/status/${jobId}`)
+  const res = await request<BackendJobStatus>(`/convert/status/${jobId}`)
   return {
     ...res,
     id: res.job_id,
@@ -271,7 +308,7 @@ export async function downloadResult(jobId: string): Promise<Blob> {
 
 export async function getHistory(page = 1, limit = 20): Promise<{ jobs: JobStatus[]; total: number }> {
   // Backend returns HistoryResponse: { jobs: JobStatus[], total: number }
-  const res = await request<{ jobs: any[]; total: number }>(
+  const res = await request<{ jobs: BackendJobStatus[]; total: number }>(
     `/convert/history?page=${page}&page_size=${limit}`
   )
   return {
@@ -301,7 +338,7 @@ export async function updateSetting(
 }
 
 export async function getLLMConfig(): Promise<LLMConfig> {
-  const res = await request<any>('/settings/llm/config')
+  const res = await request<BackendLLMConfig>('/settings/llm/config')
   return mapBackendToFrontendLLM(res)
 }
 

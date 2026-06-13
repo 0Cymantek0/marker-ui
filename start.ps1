@@ -41,20 +41,6 @@ function Get-PythonCmd {
     return $null
 }
 
-# ── Clean up orphaned processes ──────────────────────────────────────
-Write-Host "  Checking and cleaning up any orphaned processes on ports 8000 and 5173..." -ForegroundColor DarkGray
-foreach ($port in @(8000, 5173)) {
-    $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-    if ($connections) {
-        foreach ($conn in $connections) {
-            $pid = $conn.OwningProcess
-            if ($pid) {
-                Write-Host "    Killing process $pid on port $port..." -ForegroundColor DarkYellow
-                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
-            }
-        }
-    }
-}
 
 # ── Check prerequisites ──────────────────────────────────────────────
 
@@ -211,6 +197,16 @@ if ($backendPort -ne 8000) {
 
 $env:BACKEND_PORT = $backendPort
 
+$frontendPort = Find-FreePort -StartPort 5173
+if (-not $frontendPort) {
+    Write-Host "  ERROR: No free port found for frontend." -ForegroundColor Red
+    exit 1
+}
+
+if ($frontendPort -ne 5173) {
+    Write-Host "  Port 5173 is in use, using port $frontendPort instead." -ForegroundColor DarkYellow
+}
+
 # Backend
 Write-Host "  Starting backend on http://localhost:$backendPort ..." -ForegroundColor Cyan
 $venvPythonFull = (Resolve-Path $venvPython).Path
@@ -224,11 +220,11 @@ if ($backendJob.HasExited) {
 }
 
 # Frontend - use cmd.exe because npm is a .cmd file on Windows, not a real .exe
-Write-Host "  Starting frontend on http://localhost:5173 ..." -ForegroundColor Cyan
+Write-Host "  Starting frontend on http://localhost:$frontendPort ..." -ForegroundColor Cyan
 if ($IsWindows -or $env:OS -match "Windows") {
-    $frontendJob = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "set BACKEND_PORT=$backendPort&& npm run dev" -WorkingDirectory "$PWD\frontend" -PassThru -WindowStyle Hidden
+    $frontendJob = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "set BACKEND_PORT=$backendPort&& npm run dev -- --port $frontendPort" -WorkingDirectory "$PWD\frontend" -PassThru -WindowStyle Hidden
 } else {
-    $frontendJob = Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "$PWD/frontend" -PassThru -WindowStyle Hidden
+    $frontendJob = Start-Process -FilePath "npm" -ArgumentList "run", "dev", "--", "--port", "$frontendPort" -WorkingDirectory "$PWD/frontend" -PassThru -WindowStyle Hidden
 }
 
 Start-Sleep -Seconds 3
@@ -236,15 +232,15 @@ Start-Sleep -Seconds 3
 # ── Done ─────────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "  ═══════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "  ===================================================" -ForegroundColor Green
 Write-Host "  Marker UI is running!" -ForegroundColor Green
 Write-Host ""
-Write-Host "    Frontend:  http://localhost:5173" -ForegroundColor White
+Write-Host "    Frontend:  http://localhost:$frontendPort" -ForegroundColor White
 Write-Host "    Backend:   http://localhost:$backendPort" -ForegroundColor White
 Write-Host "    API Docs:  http://localhost:$backendPort/docs" -ForegroundColor White
 Write-Host ""
 Write-Host "  Press Ctrl+C to stop both services." -ForegroundColor DarkGray
-Write-Host "  ═══════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "  ===================================================" -ForegroundColor Green
 Write-Host ""
 
 # Wait for user to press Ctrl+C

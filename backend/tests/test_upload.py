@@ -130,3 +130,52 @@ class TestUploadSuccess:
         )
         assert resp.status_code == 200
         assert resp.json()["output_format"] == "json"
+
+
+# ---------------------------------------------------------------------------
+# Local file paths
+# ---------------------------------------------------------------------------
+
+
+class TestUploadLocalFile:
+    @pytest.mark.asyncio
+    async def test_missing_file_and_path_returns_400(self, upload_client: AsyncClient):
+        resp = await upload_client.post("/api/convert/upload")
+        assert resp.status_code == 400
+        assert "Either an uploaded file or a local_filepath must be provided." in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_non_absolute_local_path_rejected(self, upload_client: AsyncClient):
+        resp = await upload_client.post(
+            "/api/convert/upload",
+            params={"local_filepath": "relative/path/file.pdf"}
+        )
+        assert resp.status_code == 400
+        assert "must be an absolute path" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_non_existent_local_path_rejected(self, upload_client: AsyncClient):
+        import os
+        # Generate an absolute path that does not exist
+        fake_path = "/non_existent_file_xyz.pdf" if os.name != "nt" else "C:\\non_existent_file_xyz.pdf"
+        resp = await upload_client.post(
+            "/api/convert/upload",
+            params={"local_filepath": fake_path}
+        )
+        assert resp.status_code == 400
+        assert "Local file not found" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_valid_local_path_accepted(self, upload_client: AsyncClient, tmp_path):
+        # Create a temp file on disk
+        temp_file = tmp_path / "valid.pdf"
+        temp_file.write_bytes(b"%PDF-1.4 fake")
+        
+        resp = await upload_client.post(
+            "/api/convert/upload",
+            params={"local_filepath": str(temp_file.resolve())}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "pending"
+        assert body["filename"] == "valid.pdf"

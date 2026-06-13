@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
 # Marker UI - One-click launcher (Linux / macOS)
 # Usage: chmod +x start.sh && ./start.sh
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -24,25 +24,9 @@ ok()    { echo -e "  ${GREEN}$1${NC}"; }
 warn()  { echo -e "  ${YELLOW}$1${NC}"; }
 err()   { echo -e "  ${RED}$1${NC}"; }
 
-# â”€â”€ Clean up orphaned processes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-echo -e "  Checking and cleaning up any orphaned processes on ports 8000 and 5173..."
-for port in 8000 5173; do
-    if command -v lsof &>/dev/null; then
-        pid=$(lsof -t -i:$port 2>/dev/null || true)
-        if [ -n "$pid" ]; then
-            warn "    Killing process $pid on port $port..."
-            kill -9 $pid 2>/dev/null || true
-        fi
-    elif command -v fuser &>/dev/null; then
-        pid=$(fuser $port/tcp 2>/dev/null || true)
-        if [ -n "$pid" ]; then
-            warn "    Killing process $pid on port $port..."
-            kill -9 $pid 2>/dev/null || true
-        fi
-    fi
-done
-
-# â”€â”€ Prerequisites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Prerequisites
+# ----------------------------------------------------------------------
 echo -e "${YELLOW}[1/6] Checking prerequisites...${NC}"
 
 PYTHON=""
@@ -67,7 +51,9 @@ if ! command -v node &>/dev/null; then
 fi
 ok "Node.js: $(node --version)"
 
-# â”€â”€ Virtual environment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Virtual environment
+# ----------------------------------------------------------------------
 echo ""
 echo -e "${YELLOW}[2/6] Setting up Python virtual environment...${NC}"
 
@@ -84,7 +70,9 @@ fi
 source .venv/bin/activate
 ok "Virtual environment ready"
 
-# â”€â”€ Install Python deps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Install Python deps
+# ----------------------------------------------------------------------
 echo ""
 echo -e "${YELLOW}[3/6] Installing Python dependencies...${NC}"
 
@@ -107,7 +95,9 @@ else
     info "Python dependencies already installed, skipping check."
 fi
 
-# â”€â”€ Install Node deps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Install Node deps
+# ----------------------------------------------------------------------
 echo ""
 echo -e "${YELLOW}[4/6] Installing Node.js dependencies...${NC}"
 
@@ -125,13 +115,17 @@ fi
 cd ..
 ok "Node.js dependencies installed"
 
-# â”€â”€ Data dirs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Data dirs
+# ----------------------------------------------------------------------
 echo ""
 echo -e "${YELLOW}[5/6] Creating data directories...${NC}"
 mkdir -p data/uploads data/output
 ok "Data directories ready"
 
-# â”€â”€ Start services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Start services
+# ----------------------------------------------------------------------
 echo ""
 echo -e "${YELLOW}[6/6] Starting services...${NC}"
 echo ""
@@ -165,7 +159,7 @@ find_free_port() {
     while port_in_use "$port"; do
         port=$((port + 1))
         if [ $port -ge 65535 ]; then
-            err "No free port found for backend."
+            err "No free port found."
             exit 1
         fi
     done
@@ -180,6 +174,12 @@ fi
 
 export BACKEND_PORT
 
+FRONTEND_PORT=$(find_free_port 5173)
+
+if [ "$FRONTEND_PORT" -ne 5173 ]; then
+    warn "Port 5173 is in use, using port $FRONTEND_PORT instead."
+fi
+
 # Backend
 info "Starting backend on http://localhost:$BACKEND_PORT ..."
 uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT --app-dir backend &
@@ -192,23 +192,25 @@ if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
 fi
 
 # Frontend
-info "Starting frontend on http://localhost:5173 ..."
-cd frontend && BACKEND_PORT=$BACKEND_PORT npm run dev > /dev/null 2>&1 &
+info "Starting frontend on http://localhost:$FRONTEND_PORT ..."
+cd frontend && BACKEND_PORT=$BACKEND_PORT npm run dev -- --port $FRONTEND_PORT > /dev/null 2>&1 &
 FRONTEND_PID=$!
 cd ..
 sleep 3
 
-# â”€â”€ Done â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ----------------------------------------------------------------------
+# Done
+# ----------------------------------------------------------------------
 echo ""
-ok "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+ok "========================================================"
 ok "Marker UI is running!"
 echo ""
-info "  Frontend:  ${CYAN}http://localhost:5173${NC}"
+info "  Frontend:  ${CYAN}http://localhost:$FRONTEND_PORT${NC}"
 info "  Backend:   ${CYAN}http://localhost:$BACKEND_PORT${NC}"
 info "  API Docs:  ${CYAN}http://localhost:$BACKEND_PORT/docs${NC}"
 echo ""
 warn "  Press Ctrl+C to stop both services."
-ok "â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•"
+ok "========================================================"
 echo ""
 
 # Wait

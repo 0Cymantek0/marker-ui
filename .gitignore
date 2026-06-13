@@ -74,3 +74,4 @@ models/
 *.safetensors
 AGENTS.md
 dummy.pdf
+.playwright-mcp/

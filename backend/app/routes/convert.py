@@ -461,54 +461,20 @@ async def delete_job(
     return {"status": "deleted", "job_id": job_id}
 
 
-def _browse_folder_dialog() -> str:
-    import tkinter as tk
-    from tkinter import filedialog
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    folder_path = filedialog.askdirectory(title="Select Directory")
-    root.destroy()
-    return folder_path
-
-
-def _browse_files_dialog() -> list[str]:
-    import tkinter as tk
-    from tkinter import filedialog
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    file_paths = filedialog.askopenfilenames(
-        title="Select Files",
-        filetypes=[
-            ("Supported Files", "*.pdf;*.docx;*.pptx;*.xlsx;*.epub;*.html;*.jpg;*.jpeg;*.png;*.webp;*.tiff;*.bmp"),
-            ("All Files", "*.*")
-        ]
-    )
-    root.destroy()
-    return list(file_paths)
-
-
 @router.get("/browse-folder")
 async def browse_folder() -> dict[str, str]:
     """Open a native folder selection dialog and return the selected path."""
-    import asyncio
-    try:
-        path = await asyncio.to_thread(_browse_folder_dialog)
-        return {"path": path}
-    except Exception as e:
-        logger.exception("Failed to open folder dialog")
-        raise HTTPException(status_code=500, detail=f"Failed to open folder dialog: {e}")
+    raise HTTPException(
+        status_code=501,
+        detail="Local file/folder browsing is not supported in server/headless environments."
+    )
 
 
 @router.get("/browse-files")
 async def browse_files() -> dict[str, list[str]]:
     """Open a native file selection dialog and return the selected paths."""
-    import asyncio
-    try:
-        paths = await asyncio.to_thread(_browse_files_dialog)
-        return {"paths": paths}
-    except Exception as e:
-        logger.exception("Failed to open file dialog")
-        raise HTTPException(status_code=500, detail=f"Failed to open file dialog: {e}")
+    raise HTTPException(
+        status_code=501,
+        detail="Local file/folder browsing is not supported in server/headless environments."
+    )
 

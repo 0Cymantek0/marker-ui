@@ -170,7 +170,6 @@ export function ConversionProvider({ children }: { children: React.ReactNode }) 
   }, [updateJob])
 
   const runJob = useCallback(async (job: JobState, config: ConversionConfig, outputDir?: string) => {
-    console.log("HOOK RUNJOB CALLED FOR:", job.id, "filename:", job.filename)
     updateJob(job.id, {
       phase: job.file ? 'uploading' : 'processing',
       progress: job.file ? 5 : 10,

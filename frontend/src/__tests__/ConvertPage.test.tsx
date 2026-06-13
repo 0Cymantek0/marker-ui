@@ -86,6 +86,40 @@ describe('ConvertPage component', () => {
     expect(screen.getByText('Overall:')).toBeInTheDocument()
     expect(screen.getByText('1 of 1 completed')).toBeInTheDocument()
     expect(screen.getByText('100%')).toBeInTheDocument()
+
+    // Verify download button is present for completed job
+    expect(screen.getByRole('button', { name: /download/i })).toBeInTheDocument()
+  })
+
+  it('renders failed job and displays failure status without download button', () => {
+    mockUseConversionQueue.mockReturnValue({
+      jobs: [
+        {
+          id: 'job-failed',
+          filename: 'failed_doc.pdf',
+          file: null,
+          localPath: '',
+          phase: 'failed',
+          progress: 50,
+          statusText: 'Conversion failed',
+          jobId: 'job-uuid-failed',
+          error: 'Error: Extraction failed',
+          logs: ['Failed step'],
+          outputFormat: 'markdown'
+        }
+      ],
+      start: vi.fn(),
+      cancel: vi.fn(),
+      download: vi.fn(),
+      clearLogs: vi.fn(),
+      removeJob: vi.fn(),
+    })
+
+    render(<ConvertPage />)
+
+    expect(screen.getByText('failed_doc.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Conversion failed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /download/i })).not.toBeInTheDocument()
   })
 
   it('toggles console visibility when clicking the console buttons', () => {

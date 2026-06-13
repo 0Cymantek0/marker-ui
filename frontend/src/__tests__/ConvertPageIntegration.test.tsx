@@ -69,10 +69,7 @@ describe('ConvertPage Integration with real hook', () => {
     const textarea = container.querySelector('textarea')!
     fireEvent.change(textarea, { target: { value: 'C:\\test_document.pdf' } })
     
-    console.log('TEXTAREA VALUE:', textarea.value)
-    
     const convertBtn = screen.getByRole('button', { name: /convert/i })
-    console.log('BUTTON TEXT:', convertBtn.textContent, 'DISABLED:', convertBtn.hasAttribute('disabled'))
     expect(convertBtn).toBeInTheDocument()
     expect(convertBtn).not.toBeDisabled()
 
