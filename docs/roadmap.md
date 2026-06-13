@@ -38,6 +38,12 @@ This document outlines the planned evolutionary phases for Marker UI. We focus o
 ### 3. Website URL Compilation & Rich Media Extraction
 - Allow users to compile any website from a URL.
 - Convert all website information—including text, charts, bar graphs, imagery, audio, and video—into Markdown, JSON, HTML, and chunks formats.
+- **YouTube & Rich Video Processing**:
+  - Support full extraction of video data from YouTube.
+  - Employ an agentic framework or multimodal models to analyze the video from start to finish.
+  - Go beyond simple transcripts to extract intent, generate comprehensive descriptions for specific timestamps, and catalog exact highlight moments.
+  - Fetch external and metadata context: comments, video description, links/resources mentioned or talked about in the video.
+  - Build a high-fidelity visual surrogate/description to act as a lossless textual replacement for the physical video.
 
 ### 4. Custom OCR Engine Selection
 - Allow users to select and configure custom OCR models.
