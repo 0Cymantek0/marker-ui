@@ -6,6 +6,7 @@ import {
   XCircle,
   Database,
   ArrowRight,
+  Lightbulb,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -117,29 +118,18 @@ export function EngineConsole({
         </div>
 
         {/* Big visual number and speed/ETA statistics HUD */}
-        <div className="flex items-baseline justify-between gap-4">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-7xl md:text-8xl font-black tracking-tighter font-mono text-foreground">
-              {overall.progress}%
-            </span>
-            {isDownloading && (
-              <span className="text-xs text-muted-foreground/60 font-mono">
+        <div className="flex items-start gap-5">
+          <span className="text-7xl md:text-8xl font-black tracking-tighter font-mono text-foreground leading-none">
+            {overall.progress}%
+          </span>
+          {isDownloading && (
+            <div className="flex flex-col gap-2 pt-2 md:pt-3 font-mono">
+              <span className="text-sm font-bold text-foreground/90 leading-none">
                 {formatBytes(overall.downloaded_bytes)} / {formatBytes(overall.total_bytes)}
               </span>
-            )}
-          </div>
-
-          {isDownloading && (
-            <div className="flex items-center gap-4 bg-secondary/50 border border-border/40 rounded-lg px-3.5 py-2 font-mono text-xs leading-tight">
-              <div>
-                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[10px]">Speed</span>
-                <span className="text-foreground/80 font-bold">{overall.speed.toFixed(1)} MB/s</span>
-              </div>
-              <div className="w-px h-5 bg-border/40" />
-              <div>
-                <span className="text-muted-foreground/40 block uppercase font-extrabold text-[10px]">Time</span>
-                <span className="text-foreground/80 font-bold">{formatETA(overall.eta)}</span>
-              </div>
+              <span className="text-xs text-muted-foreground/60 leading-none">
+                {overall.speed.toFixed(1)} MB/s &bull; {formatETA(overall.eta)} remaining
+              </span>
             </div>
           )}
         </div>
@@ -152,6 +142,13 @@ export function EngineConsole({
             indicatorClassName={indicatorColor}
           />
         </div>
+
+        {isDownloading && (
+          <div className="flex items-start gap-2 text-[11px] text-muted-foreground/45 select-none pt-1">
+            <Lightbulb className="h-3.5 w-3.5 text-muted-foreground/35 shrink-0 mt-[1px]" />
+            <span>If download speed is slower than your actual connection, try using a VPN.</span>
+          </div>
+        )}
       </div>
 
       {/* Button Controls */}

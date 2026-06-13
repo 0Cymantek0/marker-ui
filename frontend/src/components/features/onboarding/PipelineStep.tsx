@@ -1,5 +1,6 @@
-import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
+import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
+import type { FileDownloadInfo } from '@/lib/api'
 
 export type StepStatus = 'pending' | 'downloading' | 'completed' | 'failed'
 
@@ -13,6 +14,8 @@ interface PipelineStepProps {
   totalBytes: number
   isLast?: boolean
   nextStatus?: StepStatus
+  isActive?: boolean
+  files?: Record<string, FileDownloadInfo>
 }
 
 function formatBytes(bytes: number, decimals = 1): string {
@@ -34,10 +37,16 @@ export function PipelineStep({
   totalBytes,
   isLast = false,
   nextStatus,
+  isActive = false,
+  files,
 }: PipelineStepProps) {
   const isDownloading = status === 'downloading'
   const isCompleted = status === 'completed'
   const isFailed = status === 'failed'
+
+  const filesList = Object.entries(files || {}).sort(([a], [b]) => a.localeCompare(b))
+  const totalFiles = filesList.length
+  const completedFiles = filesList.filter(([_, f]) => f.status === 'completed').length
 
   // Determine line segment color based on status and nextStatus
   let lineStyles = 'bg-border/20'
@@ -51,7 +60,7 @@ export function PipelineStep({
     } else {
       lineStyles = 'bg-gradient-to-b from-primary to-border/20'
     }
-  } else if (isDownloading) {
+  } else if (isDownloading || isActive) {
     lineStyles = 'bg-gradient-to-b from-primary/40 to-border/10'
     isLineAnimated = true
   } else if (isFailed) {
@@ -75,8 +84,8 @@ export function PipelineStep({
           className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-500 relative z-10 ${
             isCompleted
               ? 'bg-primary border-primary text-primary-foreground'
-              : isDownloading
-              ? 'bg-secondary border-primary/40 text-foreground'
+              : (isDownloading || isActive)
+              ? 'bg-secondary border-transparent text-foreground'
               : isFailed
               ? 'bg-destructive/10 border-destructive/40 text-destructive'
               : 'bg-secondary/40 border-border/40 text-muted-foreground/40'
@@ -84,12 +93,37 @@ export function PipelineStep({
         >
           {isCompleted ? (
             <CheckCircle2 className="w-5 h-5" />
-          ) : isDownloading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
           ) : isFailed ? (
             <AlertTriangle className="w-5 h-5" />
           ) : (
-            <span className="text-xs font-bold font-mono">{stepNumber}</span>
+            <>
+              <span className="text-xs font-bold font-mono">{stepNumber}</span>
+              {(isDownloading || isActive) && (
+                <svg className="absolute inset-0 w-full h-full animate-spin text-primary" viewBox="0 0 40 40">
+                  <circle
+                    className="opacity-25"
+                    cx="20"
+                    cy="20"
+                    r="18"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="transparent"
+                  />
+                  <circle
+                    className="opacity-100"
+                    cx="20"
+                    cy="20"
+                    r="18"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    fill="transparent"
+                    strokeDasharray="113"
+                    strokeDashoffset="80"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -101,8 +135,8 @@ export function PipelineStep({
             className={`text-sm md:text-base font-bold tracking-tight transition-colors duration-300 ${
               isCompleted
                 ? 'text-foreground'
-                : isDownloading
-                ? 'text-foreground/80'
+                : (isDownloading || isActive)
+                ? 'animate-step-shimmer'
                 : isFailed
                 ? 'text-destructive'
                 : 'text-muted-foreground/40'
@@ -126,6 +160,7 @@ export function PipelineStep({
               <span className="font-bold text-foreground/80">{progress}%</span>
               {totalBytes > 0 && (
                 <span>
+                  {totalFiles > 0 && `${completedFiles}/${totalFiles} files • `}
                   {formatBytes(downloadedBytes)} / {formatBytes(totalBytes)}
                 </span>
               )}
@@ -143,3 +178,4 @@ export function PipelineStep({
     </div>
   )
 }
+

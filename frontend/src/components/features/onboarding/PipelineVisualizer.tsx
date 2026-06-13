@@ -3,6 +3,7 @@ import type { ModelDownloadInfo } from '@/lib/api'
 
 interface PipelineVisualizerProps {
   models: Record<string, ModelDownloadInfo>
+  overallStatus?: string
 }
 
 interface PipelineItem {
@@ -46,6 +47,9 @@ const PIPELINE_ORDER: PipelineItem[] = [
 ]
 
 export function PipelineVisualizer({ models }: PipelineVisualizerProps) {
+  // A step is active if its own status is downloading
+  const activeKey = PIPELINE_ORDER.find((item) => models[item.key]?.status === 'downloading')?.key
+
   return (
     <div className="space-y-6">
       <div className="space-y-2 pb-2.5 border-b border-border/40">
@@ -72,6 +76,8 @@ export function PipelineVisualizer({ models }: PipelineVisualizerProps) {
               ? (models[nextStepKey]?.status as StepStatus) || 'pending'
               : undefined
 
+            const isActive = item.key === activeKey
+
             return (
               <PipelineStep
                 key={item.key}
@@ -84,6 +90,8 @@ export function PipelineVisualizer({ models }: PipelineVisualizerProps) {
                 totalBytes={totalBytes}
                 isLast={isLast}
                 nextStatus={nextStatus}
+                isActive={isActive}
+                files={model?.files}
               />
             )
           })}

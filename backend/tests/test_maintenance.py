@@ -196,8 +196,10 @@ async def test_reset_without_user_data(test_client: AsyncClient, mock_checkpoint
 
     tracker.set_initialized(True)
 
-    resp = await test_client.post("/api/models/reset?delete_user_data=false")
-    assert resp.status_code == 200
+    with patch("app.services.model_tracker.trigger_retry") as mock_retry:
+        resp = await test_client.post("/api/models/reset?delete_user_data=false")
+        assert resp.status_code == 200
+        mock_retry.assert_called_once()
     data = resp.json()
     assert data["success"] is True
     assert len(data["deleted_models"]) == 5
@@ -238,7 +240,8 @@ async def test_reset_with_user_data(test_client: AsyncClient, mock_checkpoints, 
 
     # We need to mock load_secrets_from_db because it would run async_session_factory
     # which is also patched, so it should run fine, but mocking it is safer.
-    with patch("app.core.api_manager.load_secrets_from_db") as mock_secrets:
+    with patch("app.core.api_manager.load_secrets_from_db") as mock_secrets, \
+         patch("app.services.model_tracker.trigger_retry") as mock_retry:
         resp = await test_client.post("/api/models/reset?delete_user_data=true")
         assert resp.status_code == 200
         data = resp.json()
@@ -246,6 +249,8 @@ async def test_reset_with_user_data(test_client: AsyncClient, mock_checkpoints, 
         assert len(data["deleted_models"]) == 5
         assert data["user_data_reset"] is True
         mock_secrets.assert_called_once()
+        mock_retry.assert_called_once()
+
 
     # Models folders are deleted
     for path in mock_checkpoints.values():
@@ -266,3 +271,33 @@ async def test_reset_with_user_data(test_client: AsyncClient, mock_checkpoints, 
     stmt = select(Setting).where(Setting.key == "llm_providers")
     res = await test_session.execute(stmt)
     assert res.scalar_one_or_none() is not None
+
+
+@pytest.mark.asyncio
+async def test_tracker_status_during_download_after_reset(test_client: AsyncClient, mock_checkpoints, mock_dirs, test_session: AsyncSession):
+    # Set up models folders to be empty/not healthy so they need download
+    for path in mock_checkpoints.values():
+        if (path / "manifest.json").exists():
+            (path / "manifest.json").unlink()
+            
+    # Reset tracker
+    tracker.reset()
+    
+    # Verify check_models_downloaded is False
+    from app.services.model_tracker import check_models_downloaded
+    assert check_models_downloaded() is False
+    
+    # Simulate loading starts but models not downloaded
+    tracker.set_loading(True)
+    
+    # Status should still be loading because any_downloading is False and check_models_downloaded is False
+    # Wait, check if the status check prioritizes loading/downloading properly
+    # If loading is True but any_downloading is False, get_status_dict overall status is loading.
+    # But wait, in initialize(), we only call set_loading(True) if check_models_downloaded() is True!
+    # So in a real scenario, tracker.set_loading(True) wouldn't even be called!
+    # But if it is set_loading(True) and layout model starts downloading:
+    tracker.start_model_download("layout")
+    
+    # Status should now be downloading since layout is downloading
+    assert tracker.get_status_dict()["overall"]["status"] == "downloading"
+

@@ -194,3 +194,35 @@
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
 }
+
+.animate-step-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--foreground)) 25%,
+    #000000 50%,
+    hsl(var(--foreground)) 75%,
+    hsl(var(--muted-foreground)) 100%
+  );
+  background-size: 200% auto;
+  animation: text-shimmer 1.8s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .animate-step-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--foreground)) 25%,
+    #ffffff 50%,
+    hsl(var(--foreground)) 75%,
+    hsl(var(--muted-foreground)) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+

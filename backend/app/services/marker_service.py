@@ -169,6 +169,12 @@ class MarkerService:
             if self._initialized:
                 return
 
+            import sys
+            is_pytest = "pytest" in sys.modules
+            from app.services.model_tracker import check_models_downloaded, download_all_models_parallel
+            if not check_models_downloaded() and not is_pytest:
+                logger.info("Models missing on disk. Triggering parallel download...")
+                download_all_models_parallel()
             tracker.set_loading(True)
             t0 = time.perf_counter()
             _import_marker()

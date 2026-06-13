@@ -145,8 +145,9 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
 
           {/* Right Column (Pipeline Visualizer) */}
           <div className="lg:col-span-7 py-2">
-            <PipelineVisualizer models={status.models} />
+            <PipelineVisualizer models={status.models} overallStatus={status.overall.status} />
           </div>
+
         </div>
       </div>
     </div>
