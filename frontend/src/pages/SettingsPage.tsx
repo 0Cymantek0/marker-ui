@@ -237,6 +237,7 @@ export function SettingsPage() {
         setIsPollingGpu(true)
       }
     } catch (err) {
+      console.error('Failed to toggle GPU:', err)
       toast.error('Failed to toggle GPU acceleration')
       setGpuEnabled(!checked)
     }
@@ -296,6 +297,7 @@ export function SettingsPage() {
       setActiveLLMState(active)
       toast.success('Global active LLM updated')
     } catch (err) {
+      console.error('Failed to update active LLM:', err)
       toast.error('Failed to update active LLM')
     }
   }

@@ -42,7 +42,7 @@ export function OutputViewer({ content, onDownload }: OutputViewerProps) {
     )
   }
 
-  const getTabClass = (_tab: OutputTab) => {
+  const getTabClass = () => {
     return 'text-foreground bg-muted/10 border border-border/40'
   }
 
@@ -101,7 +101,7 @@ export function OutputViewer({ content, onDownload }: OutputViewerProps) {
       </div>
 
       {/* Content panel */}
-      <div className={cn('flex-1 p-4 overflow-auto font-mono text-xs leading-relaxed', getTabClass(activeTab))}>
+      <div className={cn('flex-1 p-4 overflow-auto font-mono text-xs leading-relaxed', getTabClass())}>
         {activeTab === 'markdown' && (
           <div className="prose prose-sm dark:prose-invert max-w-none">
             <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed bg-transparent p-0 select-text">
